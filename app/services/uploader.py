@@ -7,7 +7,7 @@ from app.models.logs import add_log
 from app.models.upload import create_task, get_task, update_task
 from app.services.files import split_by_size
 from app.services.stream import EventBus
-from app.services.telegram.tdlib_client import TelegramClient
+from app.services.telegram.mtproto_client import TelegramClient
 
 
 class UploadManager:
@@ -35,10 +35,14 @@ class UploadManager:
     async def _dispatch_pending(self) -> None:
         from app.models.upload import list_tasks
 
-        tasks = list_tasks(status="pending")
+        tasks = list_tasks(status=None)
         for task in tasks:
+            if task.status not in {"pending", "auth_required"}:
+                continue
             if self._sem._value == 0:
                 return
+            if task.status == "auth_required" and not self.tg.is_ready():
+                continue
             update_task(task.id, status="queued")
             await self.bus.publish({"event": "upload", "data": {"id": task.id, "status": "queued"}})
             asyncio.create_task(self._run_task(task.id))
@@ -46,15 +50,20 @@ class UploadManager:
     async def _run_task(self, task_id: int) -> None:
         async with self._sem:
             task = get_task(task_id)
-            if not task or task.status not in {"queued", "pending"}:
+            if not task or task.status not in {"queued", "pending", "auth_required"}:
+                return
+            await self.tg.start()
+            if not self.tg.is_ready():
+                update_task(task_id, status="auth_required", error="需要认证")
+                await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "auth_required", "error": "需要认证"}})
                 return
             if self.tg.is_ready():
-                ok = await self._upload_tdlib(task_id)
+                ok = await self._upload_mtproto(task_id)
                 if ok:
                     return
             await self._upload_stub(task_id)
 
-    async def _upload_tdlib(self, task_id: int) -> bool:
+    async def _upload_mtproto(self, task_id: int) -> bool:
         task = get_task(task_id)
         if not task:
             return False
@@ -67,36 +76,31 @@ class UploadManager:
         total = path.stat().st_size
         update_task(task_id, status="uploading", total_size=total)
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "uploading"}})
-        file_id = await self.tg.send_document(path, task.description)
-        if not file_id:
-            update_task(task_id, status="failed", error="TDLib 发送失败")
-            add_log("error", f"上传失败 TDLib 发送失败: {task.source_path}")
-            await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "failed", "error": "TDLib 发送失败"}})
-            return True
-        update_task(task_id, file_id=file_id)
-
-        def handler(file: dict) -> None:
-            remote = file.get("remote") or {}
-            uploaded = remote.get("uploaded_size") or 0
-            total_size = file.get("size") or file.get("expected_size") or total
-            progress = (uploaded / total_size) * 100 if total_size else 0
-            update_task(task_id, uploaded=uploaded, total_size=total_size, progress=progress, status="uploading")
+        def progress_cb(current: int, total_size: int) -> None:
+            progress = (current / total_size) * 100 if total_size else 0
+            update_task(task_id, uploaded=current, total_size=total_size, progress=progress, status="uploading")
             asyncio.create_task(self.bus.publish({
                 "event": "upload",
                 "data": {
                     "id": task_id,
                     "status": "uploading",
-                    "uploaded": uploaded,
+                    "uploaded": current,
                     "total": total_size,
                     "progress": progress,
                 },
             }))
-            if remote.get("is_uploading_completed"):
-                update_task(task_id, status="completed", progress=100, speed=0)
-                asyncio.create_task(self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "completed"}}))
-                self._after_upload(task_id)
 
-        self.tg.register_file_handler(file_id, handler)
+        try:
+            await self.tg.send_document(path, task.description, progress_cb=progress_cb)
+        except Exception as exc:
+            update_task(task_id, status="failed", error=str(exc))
+            add_log("error", f"上传失败 MTProto: {task.source_path} ({exc})")
+            await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "failed", "error": str(exc)}})
+            return True
+
+        update_task(task_id, status="completed", progress=100, speed=0)
+        await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "completed"}})
+        self._after_upload(task_id)
         return True
 
     async def _upload_stub(self, task_id: int) -> None:
@@ -139,9 +143,6 @@ class UploadManager:
         self._after_upload(task_id)
 
     async def cancel(self, task_id: int) -> None:
-        task = get_task(task_id)
-        if task and task.file_id:
-            await self.tg.cancel_upload(task.file_id)
         update_task(task_id, status="canceled")
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
 

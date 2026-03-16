@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse, urljoin
+import re
 
 import httpx
 
@@ -36,6 +37,18 @@ def _guess_type(filename: str) -> str:
     if ext in {"mp4", "mkv", "mov", "mp3", "wav", "flac"}:
         return "media"
     return "file"
+
+
+def _parse_content_range(value: Optional[str]) -> Optional[int]:
+    if not value:
+        return None
+    match = re.match(r"bytes\\s+\\d+-\\d+/(\\d+|\\*)", value)
+    if not match:
+        return None
+    total = match.group(1)
+    if total == "*":
+        return None
+    return int(total)
 
 
 async def download_task(task_id: int, bus: EventBus) -> None:
@@ -92,38 +105,40 @@ async def download_task(task_id: int, bus: EventBus) -> None:
     else:
         async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
             try:
-                resp = await client.get(task.url, headers=headers, stream=True)
-                resp.raise_for_status()
-                total = int(resp.headers.get("Content-Length", "0"))
-                if downloaded > 0 and total > 0:
-                    total += downloaded
-                update_task(task_id, total_size=total)
-                async for chunk in resp.aiter_bytes(CHUNK_SIZE):
-                    if not chunk:
-                        continue
-                    if get_task(task_id).status in {"paused", "canceled"}:
-                        return
-                    tmp_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(tmp_path, "ab") as f:
-                        f.write(chunk)
-                    downloaded += len(chunk)
-                    now = time.time()
-                    if now - last_update >= 1:
-                        speed = (downloaded / max(now - start_time, 0.001))
-                        progress = (downloaded / total) * 100 if total > 0 else 0
-                        update_task(task_id, downloaded=downloaded, speed=speed, progress=progress)
-                        await bus.publish({
-                            "event": "download",
-                            "data": {
-                                "id": task_id,
-                                "status": "downloading",
-                                "downloaded": downloaded,
-                                "total": total,
-                                "speed": speed,
-                                "progress": progress,
-                            },
-                        })
-                        last_update = now
+                async with client.stream("GET", task.url, headers=headers) as resp:
+                    resp.raise_for_status()
+                    cr_total = _parse_content_range(resp.headers.get("Content-Range"))
+                    total = cr_total or int(resp.headers.get("Content-Length", "0"))
+                    if downloaded > 0 and total > 0 and not cr_total:
+                        total += downloaded
+                    update_task(task_id, total_size=total)
+                    async for chunk in resp.aiter_bytes(CHUNK_SIZE):
+                        if not chunk:
+                            continue
+                        if get_task(task_id).status in {"paused", "canceled"}:
+                            return
+                        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+                        with open(tmp_path, "ab") as f:
+                            f.write(chunk)
+                        downloaded += len(chunk)
+                        now = time.time()
+                        if now - last_update >= 1:
+                            speed = (downloaded / max(now - start_time, 0.001))
+                            progress = (downloaded / total) * 100 if total > 0 else 0
+                            progress = min(progress, 100.0)
+                            update_task(task_id, downloaded=downloaded, speed=speed, progress=progress)
+                            await bus.publish({
+                                "event": "download",
+                                "data": {
+                                    "id": task_id,
+                                    "status": "downloading",
+                                    "downloaded": downloaded,
+                                    "total": total,
+                                    "speed": speed,
+                                    "progress": progress,
+                                },
+                            })
+                            last_update = now
             except Exception as exc:
                 update_task(task_id, status="failed", error=str(exc))
                 add_log("error", f"下载失败 {task.url}: {exc}")
@@ -152,33 +167,34 @@ async def _download_range(task_id: int, url: str, tmp_path: Path, total: int, bu
         end = total - 1 if index == parts - 1 else (start + chunk_size - 1)
         headers = {"Range": f"bytes={start}-{end}"}
         async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-            resp = await client.get(url, headers=headers, stream=True)
-            resp.raise_for_status()
-            with open(tmp_path, "r+b") as f:
-                f.seek(start)
-                async for chunk in resp.aiter_bytes(CHUNK_SIZE):
-                    if not chunk:
-                        continue
-                    if get_task(task_id).status in {"paused", "canceled"}:
-                        return
-                    f.write(chunk)
-                    async with lock:
-                        downloaded += len(chunk)
-                        now = time.time()
-                        speed = (downloaded / max(now - start_time, 0.001))
-                        progress = (downloaded / total) * 100 if total > 0 else 0
-                        update_task(task_id, downloaded=downloaded, speed=speed, progress=progress, total_size=total)
-                        await bus.publish({
-                            "event": "download",
-                            "data": {
-                                "id": task_id,
-                                "status": "downloading",
-                                "downloaded": downloaded,
-                                "total": total,
-                                "speed": speed,
-                                "progress": progress,
-                            },
-                        })
+            async with client.stream("GET", url, headers=headers) as resp:
+                resp.raise_for_status()
+                with open(tmp_path, "r+b") as f:
+                    f.seek(start)
+                    async for chunk in resp.aiter_bytes(CHUNK_SIZE):
+                        if not chunk:
+                            continue
+                        if get_task(task_id).status in {"paused", "canceled"}:
+                            return
+                        f.write(chunk)
+                        async with lock:
+                            downloaded += len(chunk)
+                            now = time.time()
+                            speed = (downloaded / max(now - start_time, 0.001))
+                            progress = (downloaded / total) * 100 if total > 0 else 0
+                            progress = min(progress, 100.0)
+                            update_task(task_id, downloaded=downloaded, speed=speed, progress=progress, total_size=total)
+                            await bus.publish({
+                                "event": "download",
+                                "data": {
+                                    "id": task_id,
+                                    "status": "downloading",
+                                    "downloaded": downloaded,
+                                    "total": total,
+                                    "speed": speed,
+                                    "progress": progress,
+                                },
+                            })
 
     try:
         await asyncio.gather(*(fetch_part(i) for i in range(parts)))
@@ -247,15 +263,15 @@ async def _download_m3u8(task_id: int, url: str, final_path: Path, bus: EventBus
         name = tmp_dir / f"{idx:06d}.ts"
         async with sem:
             async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-                resp = await client.get(seg_url, stream=True)
-                resp.raise_for_status()
-                with open(name, "wb") as f:
-                    async for chunk in resp.aiter_bytes(CHUNK_SIZE):
-                        if not chunk:
-                            continue
-                        if get_task(task_id).status in {"paused", "canceled"}:
-                            return
-                        f.write(chunk)
+                async with client.stream("GET", seg_url) as resp:
+                    resp.raise_for_status()
+                    with open(name, "wb") as f:
+                        async for chunk in resp.aiter_bytes(CHUNK_SIZE):
+                            if not chunk:
+                                continue
+                            if get_task(task_id).status in {"paused", "canceled"}:
+                                return
+                            f.write(chunk)
         async with lock:
             completed += 1
             progress = (completed / total_segments) * 100

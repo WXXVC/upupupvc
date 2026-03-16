@@ -22,16 +22,22 @@ class DownloadTask:
     retries: int
 
 
-def create_tasks(urls: Iterable[str]) -> List[int]:
+def create_tasks(urls: Iterable[dict] | Iterable[str]) -> List[int]:
     ids: List[int] = []
     with get_connection() as conn:
-        for url in urls:
+        for item in urls:
+            if isinstance(item, dict):
+                url = item.get("url")
+                filename = item.get("filename")
+            else:
+                url = item
+                filename = None
             cur = conn.execute(
                 """
-                INSERT INTO download_tasks (url, file_type, status)
-                VALUES (:url, :file_type, 'pending')
+                INSERT INTO download_tasks (url, file_type, status, filename)
+                VALUES (:url, :file_type, 'pending', :filename)
                 """,
-                {"url": url, "file_type": "unknown"},
+                {"url": url, "file_type": "unknown", "filename": filename},
             )
             ids.append(cur.lastrowid)
         conn.commit()

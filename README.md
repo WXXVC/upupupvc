@@ -16,16 +16,17 @@
 - 数据库：SQLite（`data.db`）
 - 任务调度：进程内异步 + 线程池
 - 通信：SSE
-- Telegram：TDLib（tdjson）
+- Telegram：MTProto（Telethon）
 
 ## 本地运行
 
 ```bash
 python -m venv .venv
-. .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+. .venv/bin/activate 
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 9988
 ```
+win端：一键启动 start.bat
 
 访问 `http://localhost:9988`，首次进入将跳转到配置页。
 
@@ -48,8 +49,7 @@ docker run -p 9988:9988 \
 ## 配置与认证
 
 - 需要配置 Telegram `api_id`、`api_hash`、手机号与目标频道
-- 认证流程依赖 TDLib `authorizationState` 状态机
-- TDLib 需要 `tdjson` 动态库路径（Windows: `tdjson.dll`）
+- 认证流程使用 MTProto（Telethon），首次上传会触发验证码/两步验证
 
 ## 下载与上传
 
@@ -71,3 +71,4 @@ docker run -p 9988:9988 \
 ## 依赖说明
 
 - `imageio-ffmpeg` 提供 ffmpeg 二进制，用于 m3u8 与视频分片
+- `telethon` 用于 MTProto 客户端上传

@@ -13,10 +13,6 @@ class Config:
     phone_number: Optional[str]
     target_channel: Optional[str]
     download_path: Optional[str]
-    tdlib_lib_path: Optional[str]
-    tdlib_database_dir: Optional[str]
-    tdlib_files_dir: Optional[str]
-    tdlib_encryption_key: Optional[str]
     max_download_concurrency: int
     split_threshold_mb: int
     download_postprocess: str
@@ -31,11 +27,7 @@ DEFAULTS = Config(
     api_hash=None,
     phone_number=None,
     target_channel=None,
-    download_path=None,
-    tdlib_lib_path=None,
-    tdlib_database_dir=None,
-    tdlib_files_dir=None,
-    tdlib_encryption_key=None,
+    download_path="./downloads",
     max_download_concurrency=3,
     split_threshold_mb=2048,
     download_postprocess="keep",
@@ -57,10 +49,6 @@ def load_config() -> Config:
             phone_number=row["phone_number"],
             target_channel=row["target_channel"],
             download_path=row["download_path"],
-            tdlib_lib_path=row["tdlib_lib_path"],
-            tdlib_database_dir=row["tdlib_database_dir"],
-            tdlib_files_dir=row["tdlib_files_dir"],
-            tdlib_encryption_key=row["tdlib_encryption_key"],
             max_download_concurrency=row["max_download_concurrency"] or DEFAULTS.max_download_concurrency,
             split_threshold_mb=row["split_threshold_mb"] or DEFAULTS.split_threshold_mb,
             download_postprocess=row["download_postprocess"] or DEFAULTS.download_postprocess,
@@ -77,11 +65,7 @@ def save_config(data: dict) -> None:
         "api_hash": data.get("api_hash"),
         "phone_number": data.get("phone_number"),
         "target_channel": data.get("target_channel"),
-        "download_path": data.get("download_path"),
-        "tdlib_lib_path": data.get("tdlib_lib_path"),
-        "tdlib_database_dir": data.get("tdlib_database_dir"),
-        "tdlib_files_dir": data.get("tdlib_files_dir"),
-        "tdlib_encryption_key": data.get("tdlib_encryption_key"),
+        "download_path": data.get("download_path") or DEFAULTS.download_path,
         "max_download_concurrency": int(data.get("max_download_concurrency") or DEFAULTS.max_download_concurrency),
         "split_threshold_mb": int(data.get("split_threshold_mb") or DEFAULTS.split_threshold_mb),
         "download_postprocess": data.get("download_postprocess") or DEFAULTS.download_postprocess,
@@ -107,10 +91,6 @@ def save_config(data: dict) -> None:
                 phone_number = :phone_number,
                 target_channel = :target_channel,
                 download_path = :download_path,
-                tdlib_lib_path = :tdlib_lib_path,
-                tdlib_database_dir = :tdlib_database_dir,
-                tdlib_files_dir = :tdlib_files_dir,
-                tdlib_encryption_key = :tdlib_encryption_key,
                 max_download_concurrency = :max_download_concurrency,
                 split_threshold_mb = :split_threshold_mb,
                 download_postprocess = :download_postprocess,

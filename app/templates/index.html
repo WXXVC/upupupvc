@@ -11,21 +11,27 @@
     <div class="brand">Telegram 媒体下载与上传</div>
     <div class="actions">
       <div class="stats">
-        <span class="pill">下载路径: {{ config.download_path or '-' }}</span>
+        <span class="pill">下载路径: {{ config.download_path or './downloads' }}</span>
         <span class="pill">磁盘: <span id="disk-usage">--</span></span>
         <span class="pill">认证: <span id="auth-status">未知</span></span>
       </div>
       <div class="actions">
         <button id="theme-toggle" type="button" class="ghost">切换主题</button>
         <a class="ghost" href="/logs">日志</a>
-        <a class="button" href="/config">设置</a>
       </div>
     </div>
   </header>
 
-  <main class="layout">
-    <section class="panel">
-      <h2>下载任务</h2>
+  <nav class="tabs">
+    <button class="tab-button" data-tab-button="download">下载</button>
+    <button class="tab-button" data-tab-button="download-tasks">下载任务</button>
+    <button class="tab-button" data-tab-button="upload-tasks">上传任务</button>
+    <button class="tab-button" data-tab-button="settings">设置</button>
+  </nav>
+
+  <main class="tab-panels">
+    <section class="panel tab-panel" data-tab-panel="download">
+      <h2>下载</h2>
       <form id="download-form" class="toolbar">
         <input id="download-url" placeholder="粘贴 URL，回车创建任务" />
         <button type="submit">创建</button>
@@ -34,6 +40,10 @@
         <textarea id="download-batch" rows="4" placeholder="批量下载：每行一个 URL"></textarea>
         <button id="download-batch-submit" type="button">批量创建</button>
       </div>
+    </section>
+
+    <section class="panel tab-panel" data-tab-panel="download-tasks">
+      <h2>下载任务</h2>
       <div class="toolbar">
         <input id="download-search" placeholder="搜索文件名或 URL" />
         <select id="download-status">
@@ -54,7 +64,7 @@
       <div id="download-list" class="empty">暂无下载任务</div>
     </section>
 
-    <section class="panel">
+    <section class="panel tab-panel" data-tab-panel="upload-tasks">
       <h2>上传任务</h2>
       <form id="upload-form" class="toolbar">
         <input id="upload-path" placeholder="输入本地文件路径，回车上传" />
@@ -78,6 +88,61 @@
       </div>
       <div id="upload-list" class="empty">暂无上传任务</div>
     </section>
+
+    <section class="panel tab-panel" data-tab-panel="settings">
+      <h2>设置</h2>
+      <form id="settings-form" class="form">
+        <div class="grid">
+          <label>Telegram API ID
+            <input name="api_id" value="{{ config.api_id or '' }}" required />
+          </label>
+          <label>Telegram API Hash
+            <input name="api_hash" value="{{ config.api_hash or '' }}" required />
+          </label>
+        </div>
+        <div class="grid">
+          <label>手机号 (含国家码)
+            <input name="phone_number" value="{{ config.phone_number or '' }}" required />
+          </label>
+          <label>目标频道 (如 @mychannel 或 -1001234567890)
+            <input name="target_channel" value="{{ config.target_channel or '' }}" required />
+          </label>
+        </div>
+        <div class="grid">
+          <label>下载路径
+            <input name="download_path" value="{{ config.download_path or './downloads' }}" />
+          </label>
+          <label>下载并发数 (1-10)
+            <input name="max_download_concurrency" type="number" min="1" max="10" value="{{ config.max_download_concurrency }}" />
+          </label>
+        </div>
+        <div class="grid">
+          <label>自动上传
+            <select name="auto_upload">
+              <option value="1" {% if config.auto_upload %}selected{% endif %}>是</option>
+              <option value="0" {% if not config.auto_upload %}selected{% endif %}>否</option>
+            </select>
+          </label>
+          <label>分割阈值 (MB)
+            <input name="split_threshold_mb" type="number" min="256" value="{{ config.split_threshold_mb }}" />
+          </label>
+        </div>
+        <div class="grid">
+          <label>上传后处理
+            <select name="upload_postprocess">
+              <option value="keep" {% if config.upload_postprocess == 'keep' %}selected{% endif %}>保留</option>
+              <option value="move" {% if config.upload_postprocess == 'move' %}selected{% endif %}>移动到目录</option>
+              <option value="delete" {% if config.upload_postprocess == 'delete' %}selected{% endif %}>删除</option>
+            </select>
+          </label>
+          <label>上传后处理目录模板
+            <input name="upload_postprocess_path" value="{{ config.upload_postprocess_path or '' }}" placeholder="例如 ./uploaded/{date}/{type}" />
+          </label>
+        </div>
+        <button type="submit">保存设置</button>
+        <div id="settings-status" class="status"></div>
+      </form>
+    </section>
   </main>
 
   <div id="auth-modal" class="modal hidden">
@@ -93,6 +158,22 @@
         </label>
         <div class="actions">
           <button type="submit">提交</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="prepare-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>下载确认</h3>
+      <p id="prepare-info" class="muted">解析中...</p>
+      <form id="prepare-form" class="form">
+        <label>文件名
+          <input id="prepare-filename" name="filename" />
+        </label>
+        <div class="actions">
+          <button type="button" id="prepare-cancel" class="ghost">取消</button>
+          <button type="submit">开始下载</button>
         </div>
       </form>
     </div>

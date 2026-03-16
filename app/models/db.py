@@ -24,10 +24,6 @@ def init_db() -> None:
                 phone_number TEXT,
                 target_channel TEXT,
                 download_path TEXT,
-                tdlib_lib_path TEXT,
-                tdlib_database_dir TEXT,
-                tdlib_files_dir TEXT,
-                tdlib_encryption_key TEXT,
                 max_download_concurrency INTEGER DEFAULT 3,
                 split_threshold_mb INTEGER DEFAULT 2048,
                 download_postprocess TEXT DEFAULT 'keep',
@@ -41,10 +37,6 @@ def init_db() -> None:
             """
         )
         _ensure_config_column(conn, "phone_number", "TEXT")
-        _ensure_config_column(conn, "tdlib_lib_path", "TEXT")
-        _ensure_config_column(conn, "tdlib_database_dir", "TEXT")
-        _ensure_config_column(conn, "tdlib_files_dir", "TEXT")
-        _ensure_config_column(conn, "tdlib_encryption_key", "TEXT")
         _ensure_config_column(conn, "upload_postprocess_path", "TEXT")
         _ensure_config_column(conn, "auto_upload", "INTEGER")
         conn.execute(

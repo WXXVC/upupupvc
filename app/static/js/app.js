@@ -33,12 +33,23 @@ const detailPanel = document.getElementById('detail-panel');
 const detailBody = document.getElementById('detail-body');
 const detailTitle = document.getElementById('detail-title');
 const detailClose = document.getElementById('detail-close');
+const prepareModal = document.getElementById('prepare-modal');
+const prepareInfo = document.getElementById('prepare-info');
+const prepareForm = document.getElementById('prepare-form');
+const prepareFilename = document.getElementById('prepare-filename');
+const prepareCancel = document.getElementById('prepare-cancel');
+const settingsForm = document.getElementById('settings-form');
+const settingsStatus = document.getElementById('settings-status');
+const tabButtons = Array.from(document.querySelectorAll('[data-tab-button]'));
+const tabPanels = Array.from(document.querySelectorAll('[data-tab-panel]'));
 
 let downloadItems = [];
 let uploadItems = [];
 let downloadPage = 1;
 let uploadPage = 1;
 const PAGE_SIZE = 20;
+let pendingPrepareUrl = '';
+let autoUpload = true;
 
 function showModal(state, detail) {
   detailEl.textContent = detail || '';
@@ -52,21 +63,41 @@ function showModal(state, detail) {
   modal.classList.remove('hidden');
 }
 
+function setActiveTab(name) {
+  tabButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tabButton === name);
+  });
+  tabPanels.forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.tabPanel === name);
+  });
+  const url = new URL(window.location.href);
+  url.searchParams.set('tab', name);
+  history.replaceState({}, '', url.toString());
+}
+
 function hideModal() {
   modal.classList.add('hidden');
   codeInput.value = '';
   passwordInput.value = '';
 }
 
+function showPrepareModal(info, filename) {
+  prepareInfo.textContent = info || '';
+  prepareFilename.value = filename || '';
+  prepareModal.classList.remove('hidden');
+}
+
+function hidePrepareModal() {
+  prepareModal.classList.add('hidden');
+  pendingPrepareUrl = '';
+}
+
 async function fetchAuthStatus() {
   const res = await fetch('/api/auth/status');
   const json = await res.json();
-  if (!json.configured) return;
-  if (json.state === 'wait_code' || json.state === 'wait_password') {
-    showModal(json.state, json.detail);
-  }
-  if (json.state === 'ready') {
-    hideModal();
+  if (!json.configured) {
+    setActiveTab('settings');
+    return;
   }
   if (authStatusEl) authStatusEl.textContent = json.state || '未知';
 }
@@ -95,13 +126,17 @@ function renderDownloads() {
   downloadList.innerHTML = downloadItems.map(item => {
     const percent = item.total_size ? Math.round(item.progress) : 0;
     const badgeClass = item.status === 'completed' ? 'success' : (item.status === 'failed' ? 'fail' : 'running');
+    const statusText = statusLabel(item.status);
+    const manualUploadBtn = (!autoUpload && item.status === 'completed' && item.save_path)
+      ? `<button data-action="manual-upload" data-path="${item.save_path}">手动上传</button>`
+      : '';
     return `
       <div class="task" data-type="download" data-id="${item.id}">
         <div>
           <div class="task-title">${item.filename || item.url}</div>
           <div class="task-meta">
-            <span class="badge ${badgeClass}">${item.status}</span>
-            ${percent}% | ${(item.speed || 0).toFixed(1)} B/s
+            <span class="badge ${badgeClass}">${statusText}</span>
+            ${percent}% | ${formatBytes(item.speed || 0)}/s
           </div>
           <div class="progress"><span style="width:${percent}%"></span></div>
         </div>
@@ -110,6 +145,7 @@ function renderDownloads() {
           <button data-action="resume" data-id="${item.id}">继续</button>
           <button data-action="cancel" data-id="${item.id}">取消</button>
           <button data-action="retry" data-id="${item.id}">重试</button>
+          ${manualUploadBtn}
         </div>
       </div>
     `;
@@ -140,13 +176,14 @@ function renderUploads() {
     const percent = item.total_size ? Math.round(item.progress) : 0;
     const name = item.source_path.split('\\').pop().split('/').pop();
     const badgeClass = item.status === 'completed' ? 'success' : (item.status === 'failed' ? 'fail' : 'running');
+    const statusText = statusLabel(item.status);
     return `
       <div class="task" data-type="upload" data-id="${item.id}">
         <div>
           <div class="task-title">${name}</div>
           <div class="task-meta">
-            <span class="badge ${badgeClass}">${item.status}</span>
-            ${percent}% | ${(item.speed || 0).toFixed(1)} B/s
+            <span class="badge ${badgeClass}">${statusText}</span>
+            ${percent}% | ${formatBytes(item.speed || 0)}/s
           </div>
           <div class="progress"><span style="width:${percent}%"></span></div>
         </div>
@@ -184,6 +221,14 @@ async function loadSystem() {
   } catch {}
 }
 
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const json = await res.json();
+    autoUpload = !!json.auto_upload;
+  } catch {}
+}
+
 function formatBytes(bytes) {
   if (!bytes) return '--';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -205,6 +250,27 @@ async function createDownload(urls) {
   await loadDownloads();
 }
 
+async function prepareDownload(url) {
+  pendingPrepareUrl = url;
+  showPrepareModal('解析中...', url.split('/').pop() || 'download.bin');
+  const res = await fetch('/api/download/prepare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const json = await res.json();
+  if (!json.ok) {
+    prepareInfo.textContent = `解析失败: ${json.error || '未知错误'}`;
+    return;
+  }
+  const sizeText = json.size ? formatBytes(json.size) : '未知大小';
+  const typeText = json.content_type || '未知类型';
+  const resText = json.resolution ? ` | 分辨率: ${json.resolution}` : '';
+  const durText = json.duration_text ? ` | 时长: ${json.duration_text}` : '';
+  prepareInfo.textContent = `类型: ${typeText} | 大小: ${sizeText}${resText}${durText}`;
+  prepareFilename.value = json.filename || prepareFilename.value;
+}
+
 async function actOnTask(id, action) {
   await fetch('/api/tasks/action', {
     method: 'POST',
@@ -219,7 +285,7 @@ if (downloadForm) {
     e.preventDefault();
     const url = downloadUrlInput.value.trim();
     if (!url) return;
-    await createDownload([url]);
+    await prepareDownload(url);
     downloadUrlInput.value = '';
   });
 }
@@ -230,6 +296,27 @@ if (downloadBatchSubmit) {
     if (!lines.length) return;
     await createDownload(lines);
     downloadBatch.value = '';
+  });
+}
+
+if (prepareCancel) {
+  prepareCancel.addEventListener('click', () => {
+    hidePrepareModal();
+  });
+}
+
+if (prepareForm) {
+  prepareForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!pendingPrepareUrl) return;
+    const filename = prepareFilename.value.trim();
+    await fetch('/api/tasks/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls: pendingPrepareUrl, filename }),
+    });
+    hidePrepareModal();
+    await loadDownloads();
   });
 }
 
@@ -245,6 +332,25 @@ if (uploadForm) {
     });
     uploadPathInput.value = '';
     await loadUploads();
+  });
+}
+
+if (settingsForm) {
+  settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    settingsStatus.textContent = '保存中...';
+    const data = Object.fromEntries(new FormData(settingsForm).entries());
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (json.ok) {
+      settingsStatus.textContent = '已保存';
+    } else {
+      settingsStatus.textContent = '保存失败，请检查配置';
+    }
   });
 }
 
@@ -316,6 +422,15 @@ downloadList?.addEventListener('click', (e) => {
   if (btn) {
     const id = Number(btn.dataset.id);
     const action = btn.dataset.action;
+    if (action === 'manual-upload') {
+      const path = btn.dataset.path;
+      fetch('/api/tasks/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      }).then(() => loadUploads());
+      return;
+    }
     actOnTask(id, action);
     return;
   }
@@ -376,10 +491,16 @@ if (savedTheme === 'light') {
 }
 
 fetchAuthStatus();
-loadDownloads();
+loadConfig().then(() => loadDownloads());
 loadUploads();
 loadSystem();
 connectSSE();
+
+const urlTab = new URL(window.location.href).searchParams.get('tab');
+setActiveTab(urlTab || 'download');
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => setActiveTab(btn.dataset.tabButton));
+});
 
 if (themeToggle) {
   themeToggle.addEventListener('click', () => {
@@ -441,4 +562,19 @@ function showDetail(kind, id) {
     return `<div class="row"><div class="label">${label}</div><div>${value ?? '-'}</div></div>`;
   }).join('');
   detailPanel.classList.remove('hidden');
+}
+
+function statusLabel(status) {
+  const map = {
+    pending: '等待中',
+    queued: '排队中',
+    downloading: '下载中',
+    paused: '已暂停',
+    completed: '已完成',
+    failed: '失败',
+    canceled: '已取消',
+    uploading: '上传中',
+    auth_required: '需要认证',
+  };
+  return map[status] || status;
 }

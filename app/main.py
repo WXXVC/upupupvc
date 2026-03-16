@@ -18,13 +18,15 @@ from app.models.logs import add_log
 from app.services.stream import EventBus
 from app.services.scheduler import Scheduler
 from app.services.uploader import UploadManager, enqueue_upload_for_file
-from app.services.telegram.tdlib_client import TelegramClient
+from app.services.telegram.mtproto_client import TelegramClient
+from app.services.download_prepare import router as download_prepare_router
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="Telegram Media Downloader")
+app.include_router(download_prepare_router)
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -39,7 +41,6 @@ async def on_startup() -> None:
     init_db()
     scheduler.set_concurrency(load_config().max_download_concurrency)
     uploader.set_concurrency(2)
-    await tdlib.start()
     asyncio.create_task(scheduler.run())
     asyncio.create_task(uploader.run())
 
@@ -48,6 +49,7 @@ async def on_startup() -> None:
 async def config_guard(request: Request, call_next):
     path = request.url.path
     allowlist = {
+        "/",
         "/config",
         "/api/config",
         "/api/auth/status",
@@ -58,12 +60,9 @@ async def config_guard(request: Request, call_next):
         "/static",
         "/health",
     }
-    if path == "/":
+    if not any(path == p or path.startswith(p + "/") for p in allowlist):
         if not is_configured():
-            return RedirectResponse(url="/config", status_code=302)
-    elif not any(path == p or path.startswith(p + "/") for p in allowlist):
-        if not is_configured():
-            return RedirectResponse(url="/config", status_code=302)
+            return RedirectResponse(url="/?tab=settings", status_code=302)
     return await call_next(request)
 
 
@@ -107,12 +106,8 @@ async def index(request: Request):
 
 
 @app.get("/config", response_class=HTMLResponse)
-async def config_page(request: Request):
-    cfg = load_config()
-    return templates.TemplateResponse(
-        "config.html",
-        {"request": request, "config": cfg},
-    )
+async def config_page():
+    return RedirectResponse(url="/?tab=settings", status_code=302)
 
 
 @app.get("/api/config")
@@ -137,7 +132,6 @@ async def api_save_config(request: Request):
             return JSONResponse({"ok": False, "error": "download_path_not_writable"}, status_code=400)
     save_config(data)
     scheduler.set_concurrency(load_config().max_download_concurrency)
-    await tdlib.start()
     return JSONResponse({"ok": True, "configured": is_configured()})
 
 
@@ -151,11 +145,17 @@ async def unhandled_exception(request: Request, exc: Exception):
 async def api_create_download(request: Request):
     data = await request.json()
     urls = data.get("urls")
+    filename = data.get("filename")
     if isinstance(urls, str):
-        urls = [urls]
+        urls = [{"url": urls, "filename": filename}]
     if not isinstance(urls, list) or not urls:
         return JSONResponse({"ok": False, "error": "urls required"}, status_code=400)
-    ids = create_tasks([u.strip() for u in urls if u.strip()])
+    if urls and isinstance(urls[0], str):
+        urls = [{"url": u.strip()} for u in urls if u.strip()]
+    urls = [u for u in urls if isinstance(u, dict) and u.get("url")]
+    if not urls:
+        return JSONResponse({"ok": False, "error": "urls required"}, status_code=400)
+    ids = create_tasks(urls)
     return JSONResponse({"ok": True, "ids": ids})
 
 

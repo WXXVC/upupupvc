@@ -86,6 +86,42 @@ body.app {
   padding: 24px;
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 14px 24px 0;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  background: var(--accent);
+  color: #0b1020;
+  border-color: transparent;
+}
+
+.tab-panels {
+  padding: 18px 24px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
