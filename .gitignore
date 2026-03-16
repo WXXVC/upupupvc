@@ -1,0 +1,28 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+*.log
+
+# Local runtime data
+data.db
+*.db
+tdlib/
+tdlib-data/
+tdlib-files/
+uploads/
+downloaded/
+tmp/
+
+# Python packaging/build
+build/
+dist/
+*.egg-info/
+
+# OS
+Thumbs.db
+Desktop.ini

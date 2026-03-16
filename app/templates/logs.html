@@ -1,0 +1,32 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>系统日志</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand">系统日志</div>
+    <div class="actions">
+      <a class="button" href="/">返回</a>
+    </div>
+  </header>
+  <main class="layout">
+    <section class="panel" style="grid-column: 1 / -1;">
+      <div class="toolbar">
+        <input id="log-search" placeholder="搜索日志内容" />
+        <select id="log-level">
+          <option value="">全部级别</option>
+          <option value="info">info</option>
+          <option value="error">error</option>
+        </select>
+        <button id="log-refresh" type="button">刷新</button>
+      </div>
+      <div id="log-list" class="empty">暂无日志</div>
+    </section>
+  </main>
+  <script src="/static/js/logs.js"></script>
+</body>
+</html>

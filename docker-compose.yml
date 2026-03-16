@@ -1,0 +1,8 @@
+﻿version: "3.9"
+services:
+  app:
+    build: .
+    ports:
+      - "9988:9988"
+    volumes:
+      - ./data.db:/app/data.db

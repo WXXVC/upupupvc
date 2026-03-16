@@ -1,0 +1,115 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telegram 媒体下载与上传</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand">Telegram 媒体下载与上传</div>
+    <div class="actions">
+      <div class="stats">
+        <span class="pill">下载路径: {{ config.download_path or '-' }}</span>
+        <span class="pill">磁盘: <span id="disk-usage">--</span></span>
+        <span class="pill">认证: <span id="auth-status">未知</span></span>
+      </div>
+      <div class="actions">
+        <button id="theme-toggle" type="button" class="ghost">切换主题</button>
+        <a class="ghost" href="/logs">日志</a>
+        <a class="button" href="/config">设置</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>下载任务</h2>
+      <form id="download-form" class="toolbar">
+        <input id="download-url" placeholder="粘贴 URL，回车创建任务" />
+        <button type="submit">创建</button>
+      </form>
+      <div class="toolbar">
+        <textarea id="download-batch" rows="4" placeholder="批量下载：每行一个 URL"></textarea>
+        <button id="download-batch-submit" type="button">批量创建</button>
+      </div>
+      <div class="toolbar">
+        <input id="download-search" placeholder="搜索文件名或 URL" />
+        <select id="download-status">
+          <option value="">全部状态</option>
+          <option value="pending">等待中</option>
+          <option value="queued">排队中</option>
+          <option value="downloading">下载中</option>
+          <option value="paused">已暂停</option>
+          <option value="completed">已完成</option>
+          <option value="failed">失败</option>
+        </select>
+      </div>
+      <div class="toolbar">
+        <button id="download-prev" type="button" class="ghost">上一页</button>
+        <span id="download-page" class="pill">1</span>
+        <button id="download-next" type="button" class="ghost">下一页</button>
+      </div>
+      <div id="download-list" class="empty">暂无下载任务</div>
+    </section>
+
+    <section class="panel">
+      <h2>上传任务</h2>
+      <form id="upload-form" class="toolbar">
+        <input id="upload-path" placeholder="输入本地文件路径，回车上传" />
+        <button type="submit">上传</button>
+      </form>
+      <div class="toolbar">
+        <input id="upload-search" placeholder="搜索文件名或描述" />
+        <select id="upload-status">
+          <option value="">全部状态</option>
+          <option value="pending">等待中</option>
+          <option value="queued">排队中</option>
+          <option value="uploading">上传中</option>
+          <option value="completed">已完成</option>
+          <option value="failed">失败</option>
+        </select>
+      </div>
+      <div class="toolbar">
+        <button id="upload-prev" type="button" class="ghost">上一页</button>
+        <span id="upload-page" class="pill">1</span>
+        <button id="upload-next" type="button" class="ghost">下一页</button>
+      </div>
+      <div id="upload-list" class="empty">暂无上传任务</div>
+    </section>
+  </main>
+
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Telegram 认证</h3>
+      <p id="auth-detail" class="muted">等待验证码...</p>
+      <form id="auth-form" class="form">
+        <label id="code-label">短信验证码
+          <input id="auth-code" name="code" placeholder="输入验证码" />
+        </label>
+        <label id="password-label" class="hidden">两步验证密码
+          <input id="auth-password" name="password" type="password" placeholder="输入密码" />
+        </label>
+        <div class="actions">
+          <button type="submit">提交</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="detail-panel" class="detail hidden">
+    <div class="detail-header">
+      <h3 id="detail-title">任务详情</h3>
+      <button id="detail-close" class="ghost" type="button">关闭</button>
+    </div>
+    <div id="detail-body" class="detail-body"></div>
+  </div>
+
+  <footer class="footer">
+    <span class="muted">事件流: <span id="sse-status">未连接</span></span>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
