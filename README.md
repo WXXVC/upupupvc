@@ -1,4 +1,22 @@
-﻿# Telegram 媒体下载与上传系统 (M1)
+﻿# 媒体下载与上传系统
+
+单体全栈应用（FastAPI + SQLite），用于下载各类媒体文件并上传到 Telegram 频道。支持本地运行与 Docker 部署。
+
+## 功能概览
+
+- m3u8/HLS 与直链媒体下载（断点续传/分块）
+- 下载任务管理与状态推送
+- TDLib 认证与上传（支持回退 Stub）
+- 上传任务管理与后处理
+- 日志页面与任务详情面板
+
+## 技术栈
+
+- 后端：FastAPI + Jinja2
+- 数据库：SQLite（`data.db`）
+- 任务调度：进程内异步 + 线程池
+- 通信：SSE
+- Telegram：TDLib（tdjson）
 
 ## 本地运行
 
@@ -11,47 +29,7 @@ uvicorn app.main:app --reload --port 9988
 
 访问 `http://localhost:9988`，首次进入将跳转到配置页。
 
-## M2 认证占位说明
-
-当前内置 TDLib Stub 用于打通认证流程与事件推送：
-- 配置完成后会触发认证状态 `wait_code`
-- 提交验证码时输入 `2fa` 将触发 `wait_password`（模拟两步验证）
-- 提交任意非空密码后进入 `ready`
-
-## M3 下载器说明
-
-- 已支持直链文件/图片/音视频的基础流式下载与断点续传
-- 当服务器支持 `Accept-Ranges` 且文件较大时自动启用多连接分块下载
-- 已支持基础 `m3u8` 解析与分片并发下载（ts 分片拼接，输出为 `.ts`）
-
-## M4 上传器说明
-
-- 已实现上传任务模型与队列调度（TDLib 不可用时自动降级为 Stub）
-- 下载完成后自动加入上传队列
-- 大文件按阈值进行本地分片（优先 `ffmpeg -c copy`，不可用则 Python 分片）
-- 上传任务支持取消/重试
-- 上传成功后按策略执行删除（`upload_postprocess=delete`）
-
-## TDLib 集成说明
-
-- 需要提供 `tdjson` 动态库路径（Windows: `tdjson.dll`）
-- 认证流程依赖 TDLib `authorizationState` 状态机
-- 上传进度基于 `updateFile` 回调的 `remote.uploaded_size` 与 `is_uploading_*` 字段
- 
-## FFmpeg 依赖
-
-- 项目通过 Python 依赖 `imageio-ffmpeg` 自动提供 ffmpeg 二进制（含分片与 m3u8）
-- 若无需 m3u8/转封装，可不额外配置系统 ffmpeg
-
-## M5 前端
-
-- 顶部全局状态展示（磁盘空间/认证状态）
-- 任务状态徽章与进度条
-- 主题切换（浅色/深色）
-- 日志页面与任务详情面板
-- 任务列表分页与主题持久化
-
-## Docker
+## Docker 部署
 
 ```bash
 docker build -t tg-media .
@@ -66,3 +44,30 @@ docker run -p 9988:9988 \
 - 下载/上传任务记录保存在 `data.db`（SQLite），需挂载持久化卷：`-v $PWD/data.db:/app/data.db`
 - 建议同时挂载下载目录，避免容器重启后文件丢失：`-v $PWD/downloads:/app/downloads`
 - 下载路径需在配置页设置为容器内路径（如 `/app/downloads`）
+
+## 配置与认证
+
+- 需要配置 Telegram `api_id`、`api_hash`、手机号与目标频道
+- 认证流程依赖 TDLib `authorizationState` 状态机
+- TDLib 需要 `tdjson` 动态库路径（Windows: `tdjson.dll`）
+
+## 下载与上传
+
+- 已支持直链文件/图片/音视频的基础流式下载与断点续传
+- 当服务器支持 `Accept-Ranges` 且文件较大时自动启用多连接分块下载
+- m3u8/HLS：优先使用 ffmpeg 转封装（输出 `.mp4`），无 ffmpeg 时回退为 `.ts` 拼接
+- 下载完成后可自动入队上传（可配置）
+- 上传进度基于 `updateFile` 回调的 `remote.uploaded_size` 与 `is_uploading_*` 字段
+- 上传后处理支持删除/移动（可配置路径模板）
+
+## 前端与运维
+
+- 顶部全局状态展示（磁盘空间/认证状态）
+- 任务状态徽章与进度条
+- 主题切换（浅色/深色，持久化）
+- 日志页面与任务详情面板
+- 任务列表分页
+
+## 依赖说明
+
+- `imageio-ffmpeg` 提供 ffmpeg 二进制，用于 m3u8 与视频分片
