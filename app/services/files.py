@@ -1,8 +1,11 @@
 ﻿import re
 import shutil
 import subprocess
+import unicodedata
 from pathlib import Path
 from typing import List
+
+from app.services.media import current_image_suffix, current_video_suffix
 
 
 def split_by_size(source: Path, threshold_bytes: int) -> List[Path]:
@@ -111,6 +114,64 @@ def safe_delete(path: Path) -> None:
         pass
 
 
+def related_artifact_paths(path: Path) -> List[Path]:
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+
+    def add(candidate: Path) -> None:
+        candidate = Path(candidate)
+        if candidate in seen:
+            return
+        seen.add(candidate)
+        candidates.append(candidate)
+
+    def add_file_family(base: Path) -> None:
+        add(base)
+        for suffix in {".jpg", ".jpeg", ".png", ".webp"}:
+            add(base.with_suffix(suffix))
+
+    add_file_family(path)
+    add_file_family(path.with_name(f"{path.stem}.faststart{path.suffix}"))
+    for suffix in {".mp4", ".mkv", current_video_suffix()}:
+        add_file_family(path.with_name(f"{path.stem}.transcoded{suffix}"))
+        add_file_family(path.with_suffix(suffix))
+    add_file_family(path.with_suffix(current_image_suffix()))
+
+    return candidates
+
+
+def delete_with_artifacts(path: Path) -> List[Path]:
+    deleted: list[Path] = []
+    for candidate in related_artifact_paths(path):
+        try:
+            if candidate.exists() and candidate.is_file():
+                candidate.unlink()
+                deleted.append(candidate)
+        except OSError:
+            pass
+    return deleted
+
+
+def move_final_with_cleanup(source_path: Path, final_path: Path, template: str) -> Path:
+    target_path = move_with_template(final_path, template)
+    cleanup_candidates: list[Path] = []
+    seen: set[Path] = set()
+
+    for root in (source_path, final_path):
+        for candidate in related_artifact_paths(root):
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            cleanup_candidates.append(candidate)
+
+    for candidate in cleanup_candidates:
+        if candidate == target_path:
+            continue
+        safe_delete(candidate)
+
+    return target_path
+
+
 def move_with_template(path: Path, template: str) -> Path:
     from datetime import datetime
 
@@ -124,3 +185,12 @@ def move_with_template(path: Path, template: str) -> Path:
         return Path(shutil.move(str(path), str(target_path)))
     except Exception:
         return path
+
+
+def normalize_user_path(raw: str) -> str:
+    value = (raw or "").strip()
+    value = "".join(
+        ch for ch in value
+        if not (unicodedata.category(ch) in {"Cc", "Cf"} and ch not in {"\t", "\n", "\r"})
+    )
+    return value.strip()

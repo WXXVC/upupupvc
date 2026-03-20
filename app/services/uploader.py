@@ -17,6 +17,10 @@ class UploadManager:
         self._sem = asyncio.Semaphore(concurrency)
         self._running = False
         self._concurrency = concurrency
+        self._cancel_requests: set[int] = set()
+
+    class UploadCanceled(Exception):
+        pass
 
     def set_concurrency(self, value: int) -> None:
         if value <= 0 or value == self._concurrency:
@@ -52,6 +56,7 @@ class UploadManager:
             task = get_task(task_id)
             if not task or task.status not in {"queued", "pending", "auth_required"}:
                 return
+            self._cancel_requests.discard(task_id)
             await self.tg.start()
             if not self.tg.is_ready():
                 update_task(task_id, status="auth_required", error="需要认证")
@@ -67,6 +72,10 @@ class UploadManager:
         task = get_task(task_id)
         if not task:
             return False
+        if self._is_cancel_requested(task_id):
+            update_task(task_id, status="canceled", error=None)
+            await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
+            return True
         path = Path(task.source_path)
         if not path.exists():
             update_task(task_id, status="failed", error="源文件不存在")
@@ -77,6 +86,8 @@ class UploadManager:
         update_task(task_id, status="uploading", total_size=total)
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "uploading"}})
         def progress_cb(current: int, total_size: int) -> None:
+            if self._is_cancel_requested(task_id):
+                raise self.UploadCanceled()
             progress = (current / total_size) * 100 if total_size else 0
             update_task(task_id, uploaded=current, total_size=total_size, progress=progress, status="uploading")
             asyncio.create_task(self.bus.publish({
@@ -91,16 +102,31 @@ class UploadManager:
             }))
 
         try:
-            await self.tg.send_document(path, task.description, progress_cb=progress_cb)
+            final_path = await self.tg.send_document(path, task.description, progress_cb=progress_cb)
+        except self.UploadCanceled:
+            update_task(task_id, status="canceled", error=None)
+            await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
+            self._cancel_requests.discard(task_id)
+            return True
         except Exception as exc:
+            if self._is_cancel_requested(task_id):
+                update_task(task_id, status="canceled", error=None)
+                await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
+                self._cancel_requests.discard(task_id)
+                return True
             update_task(task_id, status="failed", error=str(exc))
             add_log("error", f"上传失败 MTProto: {task.source_path} ({exc})")
             await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "failed", "error": str(exc)}})
             return True
 
+        if self._is_cancel_requested(task_id):
+            update_task(task_id, status="canceled", error=None)
+            await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
+            self._cancel_requests.discard(task_id)
+            return True
         update_task(task_id, status="completed", progress=100, speed=0)
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "completed"}})
-        self._after_upload(task_id)
+        self._after_upload(task_id, final_path=final_path)
         return True
 
     async def _upload_stub(self, task_id: int) -> None:
@@ -120,6 +146,11 @@ class UploadManager:
         uploaded = 0
         start = time.time()
         while uploaded < total:
+            if self._is_cancel_requested(task_id):
+                update_task(task_id, status="canceled", error=None)
+                await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
+                self._cancel_requests.discard(task_id)
+                return
             await asyncio.sleep(0.3)
             step = min(512 * 1024, total - uploaded)
             uploaded += step
@@ -140,31 +171,49 @@ class UploadManager:
 
         update_task(task_id, status="completed", progress=100, speed=0)
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "completed"}})
-        self._after_upload(task_id)
+        self._after_upload(task_id, final_path=path)
 
     async def cancel(self, task_id: int) -> None:
+        self._cancel_requests.add(task_id)
         update_task(task_id, status="canceled")
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "canceled"}})
 
     async def retry(self, task_id: int) -> None:
+        self._cancel_requests.discard(task_id)
         update_task(task_id, status="pending", error=None)
         await self.bus.publish({"event": "upload", "data": {"id": task_id, "status": "pending"}})
 
-    def _after_upload(self, task_id: int) -> None:
+    def _is_cancel_requested(self, task_id: int) -> bool:
+        if task_id in self._cancel_requests:
+            return True
+        task = get_task(task_id)
+        return bool(task and task.status == "canceled")
+
+    def _after_upload(self, task_id: int, final_path: Path | None = None) -> None:
         cfg = load_config()
         task = get_task(task_id)
         if not task:
             return
-        if cfg.upload_postprocess == "delete":
-            from app.services.files import safe_delete
-            safe_delete(Path(task.source_path))
+        source_path = Path(task.source_path)
+        final_output = final_path or source_path
+        postprocess = task.postprocess or cfg.upload_postprocess
+        postprocess_path = task.postprocess_path if task.postprocess_path is not None else cfg.upload_postprocess_path
+        if postprocess == "delete":
+            from app.services.files import delete_with_artifacts
+            delete_with_artifacts(source_path)
             return
-        if cfg.upload_postprocess == "move":
-            from app.services.files import move_with_template
-            move_with_template(Path(task.source_path), cfg.upload_postprocess_path or "")
+        if postprocess == "move":
+            from app.services.files import move_final_with_cleanup
+            move_final_with_cleanup(source_path, final_output, postprocess_path or "")
 
 
-def enqueue_upload_for_file(path: Path, description: str | None = None) -> list[int]:
+def enqueue_upload_for_file(
+    path: Path,
+    description: str | None = None,
+    *,
+    postprocess: str | None = None,
+    postprocess_path: str | None = None,
+) -> list[int]:
     cfg = load_config()
     threshold = (cfg.split_threshold_mb or 2048) * 1024 * 1024
     parts = split_by_size(path, threshold)
@@ -175,5 +224,13 @@ def enqueue_upload_for_file(path: Path, description: str | None = None) -> list[
         if total_parts > 1:
             suffix = f" (part {idx}/{total_parts})"
             desc = (description or part.stem) + suffix
-        ids.append(create_task(str(part), cfg.target_channel, desc, idx if total_parts > 1 else None, total_parts if total_parts > 1 else None))
+        ids.append(create_task(
+            str(part),
+            cfg.target_channel,
+            desc,
+            idx if total_parts > 1 else None,
+            total_parts if total_parts > 1 else None,
+            postprocess=postprocess,
+            postprocess_path=postprocess_path,
+        ))
     return ids

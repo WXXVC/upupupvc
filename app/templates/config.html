@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -13,17 +13,47 @@
 
     <form id="config-form" class="form">
       <label>Telegram API ID
-        <input name="api_id" value="{{ config.api_id or '' }}" required />
+        <input name="api_id" value="{{ config.api_id or '' }}" autocomplete="off" required />
       </label>
       <label>Telegram API Hash
-        <input name="api_hash" value="{{ config.api_hash or '' }}" required />
+        <input name="api_hash" value="{{ config.api_hash or '' }}" autocomplete="off" required />
       </label>
       <label>手机号 (含国家码)
-        <input name="phone_number" value="{{ config.phone_number or '' }}" required />
+        <input name="phone_number" value="{{ config.phone_number or '' }}" autocomplete="off" required />
       </label>
       <label>目标频道 (如 @mychannel 或 -1001234567890)
         <input name="target_channel" value="{{ config.target_channel or '' }}" required />
       </label>
+      <div class="grid">
+        <label>启用代理
+          <select name="proxy_enabled">
+            <option value="0" {% if not config.proxy_enabled %}selected{% endif %}>否</option>
+            <option value="1" {% if config.proxy_enabled %}selected{% endif %}>是</option>
+          </select>
+        </label>
+        <label>代理类型
+          <select name="proxy_type">
+            <option value="http" {% if config.proxy_type == 'http' %}selected{% endif %}>HTTP</option>
+            <option value="socks5" {% if config.proxy_type == 'socks5' %}selected{% endif %}>SOCKS5</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid">
+        <label>代理地址
+          <input name="proxy_host" value="{{ config.proxy_host or '' }}" placeholder="127.0.0.1 或 proxy.example.com" />
+        </label>
+        <label>代理端口
+          <input name="proxy_port" type="number" min="1" max="65535" value="{{ config.proxy_port or '' }}" placeholder="1080" />
+        </label>
+      </div>
+      <div class="grid">
+        <label>代理用户名 (可选)
+          <input name="proxy_username" value="{{ config.proxy_username or '' }}" />
+        </label>
+        <label>代理密码 (可选)
+          <input name="proxy_password" type="password" value="{{ config.proxy_password or '' }}" />
+        </label>
+      </div>
       <input type="hidden" name="download_path" value="{{ config.download_path or './downloads' }}" />
       <input type="hidden" name="max_download_concurrency" value="{{ config.max_download_concurrency }}" />
       <input type="hidden" name="split_threshold_mb" value="{{ config.split_threshold_mb }}" />
@@ -31,6 +61,10 @@
       <input type="hidden" name="upload_postprocess" value="{{ config.upload_postprocess }}" />
       <input type="hidden" name="upload_postprocess_path" value="{{ config.upload_postprocess_path or '' }}" />
       <input type="hidden" name="auto_upload" value="{{ 1 if config.auto_upload else 0 }}" />
+      <input type="hidden" name="transcode_video_codec" value="{{ config.transcode_video_codec or 'h264' }}" />
+      <input type="hidden" name="transcode_video_format" value="{{ config.transcode_video_format or 'mp4' }}" />
+      <input type="hidden" name="transcode_image_format" value="{{ config.transcode_image_format or 'jpg' }}" />
+      <input type="hidden" name="clear_access_password" value="0" />
 
       <button type="submit">保存并进入</button>
       <div id="status" class="status"></div>

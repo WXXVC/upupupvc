@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -8,16 +8,18 @@
 </head>
 <body class="app">
   <header class="topbar">
-    <div class="brand">Telegram 媒体下载与上传</div>
-    <div class="actions">
-      <div class="stats">
-        <span class="pill">下载路径: {{ config.download_path or './downloads' }}</span>
-        <span class="pill">磁盘: <span id="disk-usage">--</span></span>
-        <span class="pill">认证: <span id="auth-status">未知</span></span>
-      </div>
-      <div class="actions">
-        <button id="theme-toggle" type="button" class="ghost">切换主题</button>
-        <a class="ghost" href="/logs">日志</a>
+    <div class="topbar-main">
+      <div class="brand">Telegram 媒体下载与上传</div>
+      <div class="actions actions-wrap">
+        <div class="stats">
+          <span class="pill">下载路径: {{ config.download_path or './downloads' }}</span>
+          <span class="pill">磁盘: <span id="disk-usage">--</span></span>
+          <span class="pill">认证: <span id="auth-status">未知</span></span>
+        </div>
+        <div class="actions quick-actions">
+          <button id="theme-toggle" type="button" class="ghost">切换主题</button>
+          <a class="ghost" href="/logs">日志</a>
+        </div>
       </div>
     </div>
   </header>
@@ -40,12 +42,26 @@
         <textarea id="download-batch" rows="4" placeholder="批量下载：每行一个 URL"></textarea>
         <button id="download-batch-submit" type="button">批量创建</button>
       </div>
+      <div class="log-panel">
+        <div class="log-header">
+          <span>实时日志</span>
+          <button id="log-refresh-inline" type="button" class="ghost">刷新</button>
+        </div>
+        <div id="log-list-inline" class="log-body">暂无日志</div>
+      </div>
     </section>
 
     <section class="panel tab-panel" data-tab-panel="download-tasks">
       <h2>下载任务</h2>
       <div class="toolbar">
         <input id="download-search" placeholder="搜索文件名或 URL" />
+        <select id="download-file-type">
+          <option value="">全部类型</option>
+          <option value="video">视频</option>
+          <option value="image">图片</option>
+          <option value="audio">音频</option>
+          <option value="file">文件</option>
+        </select>
         <select id="download-status">
           <option value="">全部状态</option>
           <option value="pending">等待中</option>
@@ -55,21 +71,69 @@
           <option value="completed">已完成</option>
           <option value="failed">失败</option>
         </select>
+        <input id="download-date-from" type="date" title="完成时间起始" />
+        <input id="download-date-to" type="date" title="完成时间结束" />
       </div>
-      <div class="toolbar">
-        <button id="download-prev" type="button" class="ghost">上一页</button>
-        <span id="download-page" class="pill">1</span>
-        <button id="download-next" type="button" class="ghost">下一页</button>
+      <div class="bulk-bar" id="download-bulk-bar">
+        <div class="bulk-left">
+          <label class="check-all">
+            <input id="download-select-all" type="checkbox" />
+            <span>全选当前页</span>
+          </label>
+          <span id="download-selected-count" class="pill">已选 0 项</span>
+        </div>
+        <div class="bulk-actions">
+          <label class="page-size compact-inline">
+            <span>每行</span>
+            <select id="download-columns">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </label>
+          <button type="button" class="ghost" data-bulk-target="download" data-bulk-action="start">开始</button>
+          <button type="button" class="ghost" data-bulk-target="download" data-bulk-action="pause">暂停</button>
+          <button type="button" class="ghost" data-bulk-target="download" data-bulk-action="resume">继续</button>
+          <button type="button" class="ghost" data-bulk-target="download" data-bulk-action="cancel">取消</button>
+          <button type="button" class="ghost" data-bulk-target="download" data-bulk-action="batch-upload">批量上传</button>
+          <button type="button" class="ghost" data-bulk-target="download" data-bulk-action="delete">删除</button>
+        </div>
       </div>
-      <div id="download-list" class="empty">暂无下载任务</div>
+      <div id="download-list" class="task-list"></div>
+      <div class="pagination-bar">
+        <div class="pagination-actions">
+          <label class="page-size">
+            <span>每页</span>
+            <select id="download-page-size">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+          <button id="download-prev" type="button" class="ghost">上一页</button>
+          <span id="download-page" class="pill">1</span>
+          <button id="download-next" type="button" class="ghost">下一页</button>
+        </div>
+      </div>
     </section>
 
     <section class="panel tab-panel" data-tab-panel="upload-tasks">
-      <h2>上传任务</h2>
-      <form id="upload-form" class="toolbar">
-        <input id="upload-path" placeholder="输入本地文件路径，回车上传" />
-        <button type="submit">上传</button>
-      </form>
+      <div class="section-inline-header">
+        <h2>上传任务</h2>
+        <form id="upload-form" class="upload-inline-form">
+          <div class="upload-input-wrap">
+            <input id="upload-path" placeholder="输入服务端文件路径，回车上传" />
+            <button id="upload-pick" type="button" class="input-embed-btn ghost" title="选择本地文件" aria-label="选择本地文件">
+              <i data-lucide="folder-open"></i>
+            </button>
+            <input id="upload-file" type="file" class="hidden" />
+          </div>
+          <button type="submit">上传</button>
+        </form>
+      </div>
+      <div id="upload-quick-status" class="status"></div>
       <div class="toolbar">
         <input id="upload-search" placeholder="搜索文件名或描述" />
         <select id="upload-status">
@@ -81,64 +145,203 @@
           <option value="failed">失败</option>
         </select>
       </div>
-      <div class="toolbar">
-        <button id="upload-prev" type="button" class="ghost">上一页</button>
-        <span id="upload-page" class="pill">1</span>
-        <button id="upload-next" type="button" class="ghost">下一页</button>
+      <div class="bulk-bar" id="upload-bulk-bar">
+        <div class="bulk-left">
+          <label class="check-all">
+            <input id="upload-select-all" type="checkbox" />
+            <span>全选当前页</span>
+          </label>
+          <span id="upload-selected-count" class="pill">已选 0 项</span>
+        </div>
+        <div class="bulk-actions">
+          <label class="page-size compact-inline">
+            <span>每行</span>
+            <select id="upload-columns">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </label>
+          <button type="button" class="ghost" data-bulk-target="upload" data-bulk-action="start">开始</button>
+          <button type="button" class="ghost" data-bulk-target="upload" data-bulk-action="cancel">取消</button>
+          <button type="button" class="ghost" data-bulk-target="upload" data-bulk-action="delete">删除</button>
+        </div>
       </div>
-      <div id="upload-list" class="empty">暂无上传任务</div>
+      <div id="upload-list" class="task-list"></div>
+      <div class="pagination-bar">
+        <div class="pagination-actions">
+          <label class="page-size">
+            <span>每页</span>
+            <select id="upload-page-size">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+          <button id="upload-prev" type="button" class="ghost">上一页</button>
+          <span id="upload-page" class="pill">1</span>
+          <button id="upload-next" type="button" class="ghost">下一页</button>
+        </div>
+      </div>
     </section>
+
 
     <section class="panel tab-panel" data-tab-panel="settings">
       <h2>设置</h2>
-      <form id="settings-form" class="form">
-        <div class="grid">
-          <label>Telegram API ID
-            <input name="api_id" value="{{ config.api_id or '' }}" required />
-          </label>
-          <label>Telegram API Hash
-            <input name="api_hash" value="{{ config.api_hash or '' }}" required />
-          </label>
-        </div>
-        <div class="grid">
-          <label>手机号 (含国家码)
-            <input name="phone_number" value="{{ config.phone_number or '' }}" required />
-          </label>
-          <label>目标频道 (如 @mychannel 或 -1001234567890)
-            <input name="target_channel" value="{{ config.target_channel or '' }}" required />
-          </label>
-        </div>
-        <div class="grid">
-          <label>下载路径
-            <input name="download_path" value="{{ config.download_path or './downloads' }}" />
-          </label>
-          <label>下载并发数 (1-10)
-            <input name="max_download_concurrency" type="number" min="1" max="10" value="{{ config.max_download_concurrency }}" />
-          </label>
-        </div>
-        <div class="grid">
-          <label>自动上传
-            <select name="auto_upload">
-              <option value="1" {% if config.auto_upload %}selected{% endif %}>是</option>
-              <option value="0" {% if not config.auto_upload %}selected{% endif %}>否</option>
-            </select>
-          </label>
-          <label>分割阈值 (MB)
-            <input name="split_threshold_mb" type="number" min="256" value="{{ config.split_threshold_mb }}" />
-          </label>
-        </div>
-        <div class="grid">
-          <label>上传后处理
-            <select name="upload_postprocess">
-              <option value="keep" {% if config.upload_postprocess == 'keep' %}selected{% endif %}>保留</option>
-              <option value="move" {% if config.upload_postprocess == 'move' %}selected{% endif %}>移动到目录</option>
-              <option value="delete" {% if config.upload_postprocess == 'delete' %}selected{% endif %}>删除</option>
-            </select>
-          </label>
-          <label>上传后处理目录模板
-            <input name="upload_postprocess_path" value="{{ config.upload_postprocess_path or '' }}" placeholder="例如 ./uploaded/{date}/{type}" />
-          </label>
-        </div>
+      <form id="settings-form" class="form settings-form">
+        <section class="settings-group">
+          <div class="settings-group-head">
+            <h3>账号与目标</h3>
+            <p class="muted">Telegram 连接信息与默认发送目标。</p>
+          </div>
+          <div class="grid">
+            <label>Telegram API ID
+              <input name="api_id" value="{{ config.api_id or '' }}" autocomplete="off" required />
+            </label>
+            <label>Telegram API Hash
+              <input name="api_hash" value="{{ config.api_hash or '' }}" autocomplete="off" required />
+            </label>
+          </div>
+          <div class="grid">
+            <label>手机号（含国家码）
+              <input name="phone_number" value="{{ config.phone_number or '' }}" autocomplete="off" required />
+            </label>
+            <label>目标频道（如 @mychannel 或 -1001234567890）
+              <input name="target_channel" value="{{ config.target_channel or '' }}" required />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <div class="settings-group-head">
+            <h3>访问控制</h3>
+            <p class="muted">不设置访问密码时不启用验证；设置后需先解锁才能访问页面和接口。</p>
+          </div>
+          <div class="grid">
+            <label>访问密码
+              <input name="access_password" type="password" placeholder="留空则保持不变" autocomplete="new-password" />
+            </label>
+            <label>清空访问密码
+              <select name="clear_access_password">
+                <option value="0" selected>否</option>
+                <option value="1">是</option>
+              </select>
+            </label>
+          </div>
+          {% if config.access_password_enabled %}
+          <p class="muted">当前已启用访问密码，保存后将立即对所有页面生效。</p>
+          {% endif %}
+        </section>
+
+        <section class="settings-group">
+          <div class="settings-group-head">
+            <h3>下载与上传</h3>
+            <p class="muted">控制默认下载目录、并发、自动上传和上传后的文件处理方式。</p>
+          </div>
+          <div class="grid">
+            <label>下载路径
+              <input name="download_path" value="{{ config.download_path or './downloads' }}" />
+            </label>
+            <label>下载并发数（1-10）
+              <input name="max_download_concurrency" type="number" min="1" max="10" value="{{ config.max_download_concurrency }}" />
+            </label>
+          </div>
+          <div class="grid">
+            <label>自动上传
+              <select name="auto_upload">
+                <option value="1" {% if config.auto_upload %}selected{% endif %}>是</option>
+                <option value="0" {% if not config.auto_upload %}selected{% endif %}>否</option>
+              </select>
+            </label>
+            <label>分割阈值（MB）
+              <input name="split_threshold_mb" type="number" min="256" value="{{ config.split_threshold_mb }}" />
+            </label>
+          </div>
+          <div class="grid">
+            <label>上传后处理
+              <select name="upload_postprocess">
+                <option value="keep" {% if config.upload_postprocess == 'keep' %}selected{% endif %}>保留</option>
+                <option value="move" {% if config.upload_postprocess == 'move' %}selected{% endif %}>移动到目录</option>
+                <option value="delete" {% if config.upload_postprocess == 'delete' %}selected{% endif %}>删除</option>
+              </select>
+            </label>
+            <label>上传后处理目录模板
+              <input name="upload_postprocess_path" value="{{ config.upload_postprocess_path or '' }}" placeholder="例如 .//{date}/{type}" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <div class="settings-group-head">
+            <h3>转码策略</h3>
+            <p class="muted">用于下载后标准化与上传前兼容性处理，更改后会影响后续新任务。</p>
+          </div>
+          <p class="settings-tip settings-tip-warn">兼容性提示：MKV 或 HEVC / H.265 可能导致浏览器内预览、Telegram 直接播放或缩略图能力变差。稳定优先建议使用 H.264 + MP4 + JPG。</p>
+          <div class="grid">
+            <label>视频默认编码
+              <select name="transcode_video_codec">
+                <option value="h264" {% if config.transcode_video_codec == 'h264' %}selected{% endif %}>H.264</option>
+                <option value="hevc" {% if config.transcode_video_codec == 'hevc' %}selected{% endif %}>H.265 / HEVC</option>
+              </select>
+            </label>
+            <label>视频默认格式
+              <select name="transcode_video_format">
+                <option value="mp4" {% if config.transcode_video_format == 'mp4' %}selected{% endif %}>MP4</option>
+                <option value="mkv" {% if config.transcode_video_format == 'mkv' %}selected{% endif %}>MKV</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid">
+            <label>图片默认格式
+              <select name="transcode_image_format">
+                <option value="jpg" {% if config.transcode_image_format == 'jpg' %}selected{% endif %}>JPG</option>
+                <option value="png" {% if config.transcode_image_format == 'png' %}selected{% endif %}>PNG</option>
+                <option value="webp" {% if config.transcode_image_format == 'webp' %}selected{% endif %}>WebP</option>
+              </select>
+            </label>
+            <div></div>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <div class="settings-group-head">
+            <h3>代理设置</h3>
+            <p class="muted">用于 Telegram、网页抓取、下载链路的统一代理配置。</p>
+          </div>
+          <div class="grid">
+            <label>启用代理
+              <select name="proxy_enabled">
+                <option value="0" {% if not config.proxy_enabled %}selected{% endif %}>否</option>
+                <option value="1" {% if config.proxy_enabled %}selected{% endif %}>是</option>
+              </select>
+            </label>
+            <label>代理类型
+              <select name="proxy_type">
+                <option value="http" {% if config.proxy_type == 'http' %}selected{% endif %}>HTTP</option>
+                <option value="socks5" {% if config.proxy_type == 'socks5' %}selected{% endif %}>SOCKS5</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid">
+            <label>代理地址
+              <input name="proxy_host" value="{{ config.proxy_host or '' }}" placeholder="127.0.0.1 或 proxy.example.com" />
+            </label>
+            <label>代理端口
+              <input name="proxy_port" type="number" min="1" max="65535" value="{{ config.proxy_port or '' }}" placeholder="1080" />
+            </label>
+          </div>
+          <div class="grid">
+            <label>代理用户名（可选）
+              <input name="proxy_username" value="{{ config.proxy_username or '' }}" />
+            </label>
+            <label>代理密码（可选）
+              <input name="proxy_password" type="password" value="{{ config.proxy_password or '' }}" />
+            </label>
+          </div>
+        </section>
+
         <button type="submit">保存设置</button>
         <div id="settings-status" class="status"></div>
       </form>
@@ -171,11 +374,61 @@
         <label>文件名
           <input id="prepare-filename" name="filename" />
         </label>
+        <div id="prepare-quality" class="grid hidden">
+          <label>视频质量
+            <select id="prepare-video-format"></select>
+          </label>
+          <label>音频质量
+            <select id="prepare-audio-format"></select>
+          </label>
+        </div>
         <div class="actions">
           <button type="button" id="prepare-cancel" class="ghost">取消</button>
           <button type="submit">开始下载</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="batch-upload-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>批量上传下载文件</h3>
+      <p class="muted">图片和视频会按 Telegram 媒体组发送，描述只附加在每组第一条媒体上。</p>
+      <form id="batch-upload-form" class="form">
+        <label>统一描述
+          <textarea id="batch-upload-description" rows="4" placeholder="输入批量上传描述"></textarea>
+        </label>
+        <div class="actions">
+          <button type="button" id="batch-upload-cancel" class="ghost">取消</button>
+          <button type="submit">确认上传</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="download-batch-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>批量创建下载</h3>
+      <p class="muted">输入这批下载任务的统一文本描述，后续自动上传会继承该描述。</p>
+      <form id="download-batch-form" class="form">
+        <label>批次描述
+          <textarea id="download-batch-description" rows="4" placeholder="输入批量下载描述"></textarea>
+        </label>
+        <div class="actions">
+          <button type="button" id="download-batch-cancel" class="ghost">取消</button>
+          <button type="submit">确认创建</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="preview-modal" class="modal hidden">
+    <div class="modal-content modal-content-wide">
+      <div class="detail-header">
+        <h3 id="preview-title">文件预览</h3>
+        <button id="preview-close" class="ghost" type="button">关闭</button>
+      </div>
+      <div id="preview-body" class="preview-body"></div>
     </div>
   </div>
 
@@ -191,6 +444,7 @@
     <span class="muted">事件流: <span id="sse-status">未连接</span></span>
   </footer>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="/static/js/app.js"></script>
 </body>
 </html>
