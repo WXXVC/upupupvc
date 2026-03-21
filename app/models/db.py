@@ -3,12 +3,19 @@ import sqlite3
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-PRIMARY_DB_PATH = BASE_DIR / "data.db"
+LEGACY_DB_PATH = BASE_DIR / "data.db"
+DATA_DIR = Path(os.getenv("APP_DATA_DIR", str(BASE_DIR / "data")))
+PRIMARY_DB_PATH = Path(os.getenv("APP_DB_PATH", str(DATA_DIR / "data.db")))
 
 
 def _resolve_db_path() -> Path:
-    migrated = [path for path in BASE_DIR.glob("data.migrated*.db") if path.exists() and path.stat().st_size > 0]
+    search_dir = PRIMARY_DB_PATH.parent
+    migrated = [path for path in search_dir.glob("data.migrated*.db") if path.exists() and path.stat().st_size > 0]
     if not migrated:
+        if PRIMARY_DB_PATH.exists():
+            return PRIMARY_DB_PATH
+        if LEGACY_DB_PATH.exists():
+            return LEGACY_DB_PATH
         return PRIMARY_DB_PATH
     migrated.sort(key=lambda path: path.stat().st_mtime)
     return migrated[-1]

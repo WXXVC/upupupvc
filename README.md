@@ -17,7 +17,7 @@
 ## 技术栈
 
 - 后端：FastAPI + Jinja2
-- 数据库：SQLite（`data.db`）
+- 数据库：SQLite（默认保存在 `data/data.db`）
 - 任务调度：进程内异步 + 线程池
 - 通信：SSE
 - Telegram：MTProto（Telethon）
@@ -40,18 +40,19 @@ win端：一键启动 start.bat
 docker run -d \
   --name upupupvc \
   -p 9988:9988 \
-  -v $PWD/data.db:/app/data.db \
+  -e APP_DATA_DIR=/data \
+  -v $PWD/data:/data \
   -v $PWD/downloads:/app/downloads \
   ghcr.io/wxxvc/upupupvc:latest
 ```
-ghcr.io/<你的 GitHub 用户名或组织名>/<仓库名>:latest
-
 
 ### 任务持久化说明
 
-- 下载/上传任务记录保存在 `data.db`（SQLite），需挂载持久化卷：`-v $PWD/data.db:/app/data.db`
+- 下载/上传任务记录默认保存在 `./data/data.db`，建议挂载整个数据目录：`-v $PWD/data:/data`
 - 建议同时挂载下载目录，避免容器重启后文件丢失：`-v $PWD/downloads:/app/downloads`
 - 下载路径需在配置页设置为容器内路径（如 `/app/downloads`）
+- 首次部署前建议先执行 `mkdir -p data downloads`
+- 旧版本如果仍使用根目录下的 `./data.db`，可迁移为 `mkdir -p data && mv data.db data/data.db`
 
 ## 配置与认证
 

@@ -5,6 +5,8 @@ services:
     pull_policy: always
     ports:
       - "9988:9988"
+    environment:
+      APP_DATA_DIR: /data
     volumes:
-      - ./data.db:/app/data.db
+      - ./data:/data
       - ./downloads:/app/downloads
