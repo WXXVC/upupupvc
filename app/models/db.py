@@ -44,7 +44,9 @@ def init_db() -> None:
                 phone_number TEXT,
                 target_channel TEXT,
                 download_path TEXT,
-                max_download_concurrency INTEGER DEFAULT 3,
+                max_download_concurrency INTEGER DEFAULT 1,
+                range_download_concurrency INTEGER DEFAULT 2,
+                ytdlp_fragment_concurrency INTEGER DEFAULT 1,
                 split_threshold_mb INTEGER DEFAULT 2048,
                 download_postprocess TEXT DEFAULT 'keep',
                 upload_postprocess TEXT DEFAULT 'keep',
@@ -70,6 +72,8 @@ def init_db() -> None:
         _ensure_config_column(conn, "phone_number", "TEXT")
         _ensure_config_column(conn, "upload_postprocess_path", "TEXT")
         _ensure_config_column(conn, "auto_upload", "INTEGER")
+        _ensure_config_column(conn, "range_download_concurrency", "INTEGER")
+        _ensure_config_column(conn, "ytdlp_fragment_concurrency", "INTEGER")
         _ensure_config_column(conn, "proxy_enabled", "INTEGER")
         _ensure_config_column(conn, "proxy_type", "TEXT")
         _ensure_config_column(conn, "proxy_host", "TEXT")

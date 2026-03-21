@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -249,6 +249,14 @@
             </label>
           </div>
           <div class="grid">
+            <label>直链分段并发数（1-8）
+              <input name="range_download_concurrency" type="number" min="1" max="8" value="{{ config.range_download_concurrency }}" />
+            </label>
+            <label>yt-dlp 分片并发数（1-8）
+              <input name="ytdlp_fragment_concurrency" type="number" min="1" max="8" value="{{ config.ytdlp_fragment_concurrency }}" />
+            </label>
+          </div>
+          <div class="grid">
             <label>自动上传
               <select name="auto_upload">
                 <option value="1" {% if config.auto_upload %}selected{% endif %}>是</option>
@@ -348,19 +356,31 @@
     </section>
   </main>
 
-  <div id="auth-modal" class="modal hidden">
+  <div id="auth-code-modal" class="modal hidden">
     <div class="modal-content">
-      <h3>Telegram 认证</h3>
-      <p id="auth-detail" class="muted">等待验证码...</p>
-      <form id="auth-form" class="form">
-        <label id="code-label">短信验证码
+      <h3>Telegram 验证码</h3>
+      <p id="auth-code-detail" class="muted">请输入短信验证码</p>
+      <form id="auth-code-form" class="form">
+        <label>短信验证码
           <input id="auth-code" name="code" placeholder="输入验证码" />
         </label>
-        <label id="password-label" class="hidden">两步验证密码
-          <input id="auth-password" name="password" type="password" placeholder="输入密码" />
+        <div class="actions">
+          <button type="submit">提交验证码</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="auth-password-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Telegram 两步验证</h3>
+      <p id="auth-password-detail" class="muted">请输入两步验证密码</p>
+      <form id="auth-password-form" class="form">
+        <label>两步验证密码
+          <input id="auth-password" name="password" type="password" placeholder="输入两步验证密码" />
         </label>
         <div class="actions">
-          <button type="submit">提交</button>
+          <button type="submit">提交密码</button>
         </div>
       </form>
     </div>

@@ -137,7 +137,7 @@ class TelegramClient:
             progress_callback=progress_cb,
             supports_streaming=is_video,
             force_document=force_document,
-            thumb=str(thumb) if thumb else None,
+            thumb=str(thumb) if (thumb and not is_video) else None,
         )
         return send_path
 

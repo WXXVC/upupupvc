@@ -1,9 +1,10 @@
 ﻿const statusEl = document.getElementById('sse-status');
-const modal = document.getElementById('auth-modal');
-const detailEl = document.getElementById('auth-detail');
-const form = document.getElementById('auth-form');
-const codeLabel = document.getElementById('code-label');
-const passwordLabel = document.getElementById('password-label');
+const codeModal = document.getElementById('auth-code-modal');
+const passwordModal = document.getElementById('auth-password-modal');
+const codeDetailEl = document.getElementById('auth-code-detail');
+const passwordDetailEl = document.getElementById('auth-password-detail');
+const codeForm = document.getElementById('auth-code-form');
+const passwordForm = document.getElementById('auth-password-form');
 const codeInput = document.getElementById('auth-code');
 const passwordInput = document.getElementById('auth-password');
 
@@ -143,16 +144,16 @@ function applyTaskColumns() {
   if (uploadList) uploadList.style.setProperty('--task-columns', String(uploadColumns));
 }
 
-function showModal(state, detail) {
-  detailEl.textContent = detail || '';
-  if (state === 'wait_password') {
-    codeLabel.classList.add('hidden');
-    passwordLabel.classList.remove('hidden');
-  } else {
-    codeLabel.classList.remove('hidden');
-    passwordLabel.classList.add('hidden');
-  }
-  modal.classList.remove('hidden');
+function showAuthCodeModal(detail) {
+  if (codeDetailEl) codeDetailEl.textContent = detail || '';
+  if (passwordModal) passwordModal.classList.add('hidden');
+  if (codeModal) codeModal.classList.remove('hidden');
+}
+
+function showAuthPasswordModal(detail) {
+  if (passwordDetailEl) passwordDetailEl.textContent = detail || '';
+  if (codeModal) codeModal.classList.add('hidden');
+  if (passwordModal) passwordModal.classList.remove('hidden');
 }
 
 function setActiveTab(name) {
@@ -168,9 +169,10 @@ function setActiveTab(name) {
 }
 
 function hideModal() {
-  modal.classList.add('hidden');
-  codeInput.value = '';
-  passwordInput.value = '';
+  if (codeModal) codeModal.classList.add('hidden');
+  if (passwordModal) passwordModal.classList.add('hidden');
+  if (codeInput) codeInput.value = '';
+  if (passwordInput) passwordInput.value = '';
 }
 
 function showPrepareModal(info, filename) {
@@ -394,8 +396,12 @@ async function fetchAuthStatus() {
     return;
   }
   if (authStatusEl) authStatusEl.textContent = json.state || '未知';
-  if (json.state === 'wait_code' || json.state === 'wait_password') {
-    showModal(json.state, json.detail);
+  if (json.state === 'wait_code') {
+    showAuthCodeModal(json.detail);
+    return;
+  }
+  if (json.state === 'wait_password') {
+    showAuthPasswordModal(json.detail);
     return;
   }
   if (json.state === 'ready' || json.state === 'idle') {
@@ -403,17 +409,27 @@ async function fetchAuthStatus() {
   }
 }
 
-form?.addEventListener('submit', async (e) => {
+codeForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const isPassword = !passwordLabel.classList.contains('hidden');
-  const payload = {
-    type: isPassword ? 'password' : 'code',
-    value: isPassword ? passwordInput.value : codeInput.value,
-  };
   await fetch('/api/auth/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      type: 'code',
+      value: codeInput?.value || '',
+    }),
+  });
+});
+
+passwordForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await fetch('/api/auth/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'password',
+      value: passwordInput?.value || '',
+    }),
   });
 });
 
@@ -1477,8 +1493,11 @@ function connectSSE() {
   };
   evtSource.addEventListener('auth', (event) => {
     const payload = JSON.parse(event.data || '{}');
-    if (payload.state === 'wait_code' || payload.state === 'wait_password') {
-      showModal(payload.state, payload.detail);
+    if (payload.state === 'wait_code') {
+      showAuthCodeModal(payload.detail);
+    }
+    if (payload.state === 'wait_password') {
+      showAuthPasswordModal(payload.detail);
     }
     if (payload.state === 'ready') {
       hideModal();

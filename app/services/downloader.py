@@ -136,6 +136,7 @@ def _build_ytdlp_options(
     progress_hook,
     proxy_url: Optional[str],
     requested_format: Optional[str],
+    fragment_concurrency: int,
 ) -> dict:
     opts = {
         "outtmpl": outtmpl,
@@ -150,7 +151,7 @@ def _build_ytdlp_options(
             "size",
         ],
         "noplaylist": True,
-        "concurrent_fragment_downloads": 4,
+        "concurrent_fragment_downloads": fragment_concurrency,
         "retries": 5,
         "fragment_retries": 5,
         "merge_output_format": current_video_format(),
@@ -222,9 +223,15 @@ def _finalize_download_result(task_id: int, final_path: Path, bus: EventBus) -> 
     )
     asyncio.create_task(bus.publish({"event": "download", "data": {"id": task_id, "status": "completed"}}))
     if policy["auto_upload"]:
+        upload_description = policy["description"]
+        if not upload_description:
+            if resolved.exists():
+                upload_description = resolved.stem or resolved.name
+            elif task:
+                upload_description = task.filename or None
         enqueue_upload_for_file(
             resolved,
-            policy["description"],
+            upload_description,
             postprocess=policy.get("upload_postprocess"),
             postprocess_path=policy.get("upload_postprocess_path"),
         )
@@ -422,7 +429,15 @@ async def _download_with_ytdlp(
         else:
             outtmpl = str(base_dir / "%(title).180B.%(ext)s")
         policy = _effective_batch_policy(get_task(task_id))
-        base_opts = _build_ytdlp_options(outtmpl, web_headers, _hook, proxy_url, requested_format)
+        cfg = load_config()
+        base_opts = _build_ytdlp_options(
+            outtmpl,
+            web_headers,
+            _hook,
+            proxy_url,
+            requested_format,
+            cfg.ytdlp_fragment_concurrency,
+        )
         base_opts["merge_output_format"] = policy.get("video_format") or current_video_format()
 
         # Try impersonation first; fallback when runtime lacks this feature/deps.
@@ -491,7 +506,8 @@ async def _download_range(
     with open(tmp_path, "wb") as f:
         f.truncate(total)
 
-    parts = min(8, max(2, total // RANGE_THRESHOLD))
+    cfg = load_config()
+    parts = max(1, min(cfg.range_download_concurrency, max(2, total // RANGE_THRESHOLD)))
     chunk_size = total // parts
     lock = asyncio.Lock()
 

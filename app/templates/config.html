@@ -56,6 +56,8 @@
       </div>
       <input type="hidden" name="download_path" value="{{ config.download_path or './downloads' }}" />
       <input type="hidden" name="max_download_concurrency" value="{{ config.max_download_concurrency }}" />
+      <input type="hidden" name="range_download_concurrency" value="{{ config.range_download_concurrency }}" />
+      <input type="hidden" name="ytdlp_fragment_concurrency" value="{{ config.ytdlp_fragment_concurrency }}" />
       <input type="hidden" name="split_threshold_mb" value="{{ config.split_threshold_mb }}" />
       <input type="hidden" name="download_postprocess" value="{{ config.download_postprocess }}" />
       <input type="hidden" name="upload_postprocess" value="{{ config.upload_postprocess }}" />

@@ -16,6 +16,8 @@ class Config:
     target_channel: Optional[str]
     download_path: Optional[str]
     max_download_concurrency: int
+    range_download_concurrency: int
+    ytdlp_fragment_concurrency: int
     split_threshold_mb: int
     download_postprocess: str
     upload_postprocess: str
@@ -41,7 +43,9 @@ DEFAULTS = Config(
     phone_number=None,
     target_channel=None,
     download_path="./downloads",
-    max_download_concurrency=3,
+    max_download_concurrency=1,
+    range_download_concurrency=2,
+    ytdlp_fragment_concurrency=1,
     split_threshold_mb=2048,
     download_postprocess="keep",
     upload_postprocess="keep",
@@ -111,6 +115,8 @@ def load_config() -> Config:
             target_channel=row["target_channel"],
             download_path=row["download_path"],
             max_download_concurrency=row["max_download_concurrency"] or DEFAULTS.max_download_concurrency,
+            range_download_concurrency=row["range_download_concurrency"] or DEFAULTS.range_download_concurrency,
+            ytdlp_fragment_concurrency=row["ytdlp_fragment_concurrency"] or DEFAULTS.ytdlp_fragment_concurrency,
             split_threshold_mb=row["split_threshold_mb"] or DEFAULTS.split_threshold_mb,
             download_postprocess=row["download_postprocess"] or DEFAULTS.download_postprocess,
             upload_postprocess=row["upload_postprocess"] or DEFAULTS.upload_postprocess,
@@ -140,6 +146,8 @@ def save_config(data: dict) -> None:
         "target_channel": data.get("target_channel"),
         "download_path": data.get("download_path") or DEFAULTS.download_path,
         "max_download_concurrency": int(data.get("max_download_concurrency") or DEFAULTS.max_download_concurrency),
+        "range_download_concurrency": int(data.get("range_download_concurrency") or DEFAULTS.range_download_concurrency),
+        "ytdlp_fragment_concurrency": int(data.get("ytdlp_fragment_concurrency") or DEFAULTS.ytdlp_fragment_concurrency),
         "split_threshold_mb": int(data.get("split_threshold_mb") or DEFAULTS.split_threshold_mb),
         "download_postprocess": data.get("download_postprocess") or DEFAULTS.download_postprocess,
         "upload_postprocess": data.get("upload_postprocess") or DEFAULTS.upload_postprocess,
@@ -215,6 +223,8 @@ def save_config(data: dict) -> None:
     ])
     max_conc = max(1, min(10, fields["max_download_concurrency"]))
     fields["max_download_concurrency"] = max_conc
+    fields["range_download_concurrency"] = max(1, min(8, fields["range_download_concurrency"]))
+    fields["ytdlp_fragment_concurrency"] = max(1, min(8, fields["ytdlp_fragment_concurrency"]))
     with get_connection() as conn:
         conn.execute(
             """
@@ -225,6 +235,8 @@ def save_config(data: dict) -> None:
                 target_channel = :target_channel,
                 download_path = :download_path,
                 max_download_concurrency = :max_download_concurrency,
+                range_download_concurrency = :range_download_concurrency,
+                ytdlp_fragment_concurrency = :ytdlp_fragment_concurrency,
                 split_threshold_mb = :split_threshold_mb,
                 download_postprocess = :download_postprocess,
                 upload_postprocess = :upload_postprocess,
