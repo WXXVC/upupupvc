@@ -7,6 +7,7 @@ from telethon.errors import SessionPasswordNeededError
 
 from app.models.auth import save_auth_state
 from app.models.config import load_config
+from app.models.db import DATA_DIR
 from app.models.logs import add_log
 from app.services.media import ensure_faststart, ffmpeg_exe, generate_thumbnail, is_transcoded_video, needs_reencode_for_streaming, reencode_to_mp4
 from app.services.stream import EventBus
@@ -61,7 +62,7 @@ class TelegramClient:
             await self.client.disconnect()
             self._connected = False
             self._authorized = False
-        session_dir = Path("./telethon")
+        session_dir = DATA_DIR / "telethon"
         session_dir.mkdir(parents=True, exist_ok=True)
         session_path = session_dir / "session"
         proxy = self._build_proxy(cfg)

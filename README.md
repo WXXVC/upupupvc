@@ -49,10 +49,12 @@ docker run -d \
 ### 任务持久化说明
 
 - 下载/上传任务记录默认保存在 `./data/data.db`，建议挂载整个数据目录：`-v $PWD/data:/data`
+- Telegram 登录会话默认保存在 `./data/telethon/session*`，验证码和二次验证通过后，重建容器也会继续复用该会话
 - 建议同时挂载下载目录，避免容器重启后文件丢失：`-v $PWD/downloads:/app/downloads`
 - 下载路径需在配置页设置为容器内路径（如 `/app/downloads`）
 - 首次部署前建议先执行 `mkdir -p data downloads`
 - 旧版本如果仍使用根目录下的 `./data.db`，可迁移为 `mkdir -p data && mv data.db data/data.db`
+- 如果你之前的版本把 Telethon 会话写在容器内的 `/app/telethon`，升级后可把旧会话目录一并迁移到数据目录，例如 `mv telethon data/telethon`
 
 ## 配置与认证
 
