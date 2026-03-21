@@ -267,6 +267,7 @@ async function submitAuthValue(type, value, inputEl) {
     return;
   }
   if (inputEl) inputEl.value = '';
+  await fetchAuthStatus();
 }
 
 function showPrepareModal(info, filename) {
