@@ -37,12 +37,15 @@ win端：一键启动 start.bat
 ## Docker 部署
 
 ```bash
-docker build -t tg-media .
-docker run -p 9988:9988 \
+docker run -d \
+  --name upupupvc \
+  -p 9988:9988 \
   -v $PWD/data.db:/app/data.db \
   -v $PWD/downloads:/app/downloads \
-  tg-media
+  ghcr.io/WXXVC/upupupvc:latest
 ```
+ghcr.io/<你的 GitHub 用户名或组织名>/<仓库名>:latest
+
 
 ### 任务持久化说明
 
@@ -75,4 +78,5 @@ docker run -p 9988:9988 \
 ## 依赖说明
 
 - `imageio-ffmpeg` 提供 ffmpeg 二进制，用于 m3u8 与视频分片
+- `yt-dlp` 用于增强通用站点媒体下载能力，适合视频站点解析、格式枚举与更复杂的下载场景
 - `telethon` 用于 MTProto 客户端上传

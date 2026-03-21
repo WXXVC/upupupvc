@@ -1,8 +1,10 @@
 ﻿version: "3.9"
 services:
   app:
-    build: .
+    image: ${APP_IMAGE:-ghcr.io/WXXVC/upupupvc:latest}
+    pull_policy: always
     ports:
       - "9988:9988"
     volumes:
       - ./data.db:/app/data.db
+      - ./downloads:/app/downloads
