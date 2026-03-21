@@ -394,6 +394,13 @@ async function fetchAuthStatus() {
     return;
   }
   if (authStatusEl) authStatusEl.textContent = json.state || '未知';
+  if (json.state === 'wait_code' || json.state === 'wait_password') {
+    showModal(json.state, json.detail);
+    return;
+  }
+  if (json.state === 'ready' || json.state === 'idle') {
+    hideModal();
+  }
 }
 
 form?.addEventListener('submit', async (e) => {
