@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>访问验证</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="app">
+  <main class="panel" style="max-width: 420px; margin: 64px auto;">
+    <h1>访问验证</h1>
+    <p class="muted">已启用访问密码。验证通过后，才能访问系统页面与接口。</p>
+    <form id="unlock-form" class="form">
+      <label>访问密码
+        <input id="unlock-password" type="password" autocomplete="current-password" required />
+      </label>
+      <div class="actions">
+        <button id="unlock-submit" type="submit">验证进入</button>
+      </div>
+      <div id="unlock-status" class="status"></div>
+    </form>
+  </main>
+  <script src="/static/js/unlock.js"></script>
+</body>
+</html>
