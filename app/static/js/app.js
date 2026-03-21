@@ -51,6 +51,7 @@ const bulkButtons = Array.from(document.querySelectorAll('[data-bulk-target][dat
 
 const diskUsageEl = document.getElementById('disk-usage');
 const authStatusEl = document.getElementById('auth-status');
+const authOpenBtn = document.getElementById('auth-open-btn');
 const themeToggle = document.getElementById('theme-toggle');
 const detailPanel = document.getElementById('detail-panel');
 const detailBody = document.getElementById('detail-body');
@@ -407,6 +408,22 @@ async function fetchAuthStatus() {
   if (json.state === 'ready' || json.state === 'idle') {
     hideModal();
   }
+}
+
+async function openAuthModalFromStatus() {
+  const res = await fetch('/api/auth/status');
+  const json = await res.json();
+  if (authStatusEl) authStatusEl.textContent = json.state || '未知';
+  if (json.state === 'wait_code') {
+    showAuthCodeModal(json.detail || '请输入短信验证码');
+    return;
+  }
+  if (json.state === 'wait_password') {
+    showAuthPasswordModal(json.detail || '请输入两步验证密码');
+    return;
+  }
+  const detail = json.detail || '当前没有待输入的验证码或两步验证密码';
+  window.alert(detail);
 }
 
 codeForm?.addEventListener('submit', async (e) => {
@@ -1543,6 +1560,15 @@ tabButtons.forEach(btn => {
 if (themeToggle) {
   themeToggle.addEventListener('click', () => {
     applyTheme(document.body.classList.contains('light') ? 'dark' : 'light');
+  });
+}
+
+if (authOpenBtn) {
+  authOpenBtn.addEventListener('click', () => {
+    openAuthModalFromStatus().catch(err => {
+      console.error('open auth modal failed', err);
+      window.alert('认证状态读取失败，请稍后重试');
+    });
   });
 }
 
