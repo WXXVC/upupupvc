@@ -33,6 +33,40 @@
   </nav>
 
   <main class="tab-panels">
+    <section id="auth-inline-panel" class="panel auth-inline-panel hidden">
+      <div class="auth-inline-head">
+        <div>
+          <h2>Telegram 认证输入</h2>
+          <p id="auth-inline-summary" class="muted">当 Telegram 要求验证码或两步验证密码时，可在这里手动输入。</p>
+        </div>
+        <span id="auth-inline-state" class="pill">待命</span>
+      </div>
+      <div id="auth-inline-code-box" class="auth-inline-box hidden">
+        <h3>短信验证码</h3>
+        <p id="auth-inline-code-detail" class="muted">请输入短信验证码</p>
+        <form id="auth-inline-code-form" class="form auth-inline-form">
+          <label>短信验证码
+            <input id="auth-inline-code" name="code" placeholder="输入验证码" />
+          </label>
+          <div class="actions">
+            <button type="submit">提交验证码</button>
+          </div>
+        </form>
+      </div>
+      <div id="auth-inline-password-box" class="auth-inline-box hidden">
+        <h3>两步验证密码</h3>
+        <p id="auth-inline-password-detail" class="muted">请输入两步验证密码</p>
+        <form id="auth-inline-password-form" class="form auth-inline-form">
+          <label>两步验证密码
+            <input id="auth-inline-password" name="password" type="password" placeholder="输入两步验证密码" />
+          </label>
+          <div class="actions">
+            <button type="submit">提交密码</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
     <section class="panel tab-panel" data-tab-panel="download">
       <h2>下载</h2>
       <form id="download-form" class="toolbar">

@@ -263,6 +263,45 @@ button {
   margin-bottom: 0;
 }
 
+.auth-inline-panel {
+  display: grid;
+  gap: 14px;
+  border-color: rgba(92, 184, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(92, 184, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    var(--panel);
+}
+
+.auth-inline-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-inline-head h2 {
+  margin-bottom: 6px;
+}
+
+.auth-inline-box {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.auth-inline-box h3 {
+  margin-bottom: 8px;
+}
+
+.auth-inline-form {
+  margin-top: 12px;
+}
+
+.auth-inline-panel .actions {
+  justify-content: flex-start;
+}
+
 .upload-inline-form {
   margin-left: auto;
   display: flex;
@@ -1401,6 +1440,7 @@ button.is-error {
     padding-inline: 12px;
   }
 
+  .auth-inline-head,
   .topbar-main,
   .section-inline-header,
   .section-heading,

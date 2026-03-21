@@ -52,6 +52,17 @@ const bulkButtons = Array.from(document.querySelectorAll('[data-bulk-target][dat
 const diskUsageEl = document.getElementById('disk-usage');
 const authStatusEl = document.getElementById('auth-status');
 const authOpenBtn = document.getElementById('auth-open-btn');
+const authInlinePanel = document.getElementById('auth-inline-panel');
+const authInlineSummary = document.getElementById('auth-inline-summary');
+const authInlineState = document.getElementById('auth-inline-state');
+const authInlineCodeBox = document.getElementById('auth-inline-code-box');
+const authInlinePasswordBox = document.getElementById('auth-inline-password-box');
+const authInlineCodeDetailEl = document.getElementById('auth-inline-code-detail');
+const authInlinePasswordDetailEl = document.getElementById('auth-inline-password-detail');
+const authInlineCodeForm = document.getElementById('auth-inline-code-form');
+const authInlinePasswordForm = document.getElementById('auth-inline-password-form');
+const authInlineCodeInput = document.getElementById('auth-inline-code');
+const authInlinePasswordInput = document.getElementById('auth-inline-password');
 const themeToggle = document.getElementById('theme-toggle');
 const detailPanel = document.getElementById('detail-panel');
 const detailBody = document.getElementById('detail-body');
@@ -157,6 +168,35 @@ function showAuthPasswordModal(detail) {
   if (passwordModal) passwordModal.classList.remove('hidden');
 }
 
+function showInlineAuthPanel(mode, detail) {
+  if (authInlinePanel) authInlinePanel.classList.remove('hidden');
+  if (authInlineState) authInlineState.textContent = mode === 'wait_password' ? '等待二次验证' : '等待验证码';
+  if (authInlineSummary) {
+    authInlineSummary.textContent = mode === 'wait_password'
+      ? 'Telegram 当前需要两步验证密码。即使弹窗被浏览器拦住，也可以直接在这里输入。'
+      : 'Telegram 当前需要短信验证码。即使弹窗被浏览器拦住，也可以直接在这里输入。';
+  }
+  if (mode === 'wait_password') {
+    if (authInlineCodeBox) authInlineCodeBox.classList.add('hidden');
+    if (authInlinePasswordBox) authInlinePasswordBox.classList.remove('hidden');
+    if (authInlinePasswordDetailEl) authInlinePasswordDetailEl.textContent = detail || '请输入两步验证密码';
+  } else {
+    if (authInlinePasswordBox) authInlinePasswordBox.classList.add('hidden');
+    if (authInlineCodeBox) authInlineCodeBox.classList.remove('hidden');
+    if (authInlineCodeDetailEl) authInlineCodeDetailEl.textContent = detail || '请输入短信验证码';
+  }
+}
+
+function hideInlineAuthPanel() {
+  if (authInlinePanel) authInlinePanel.classList.add('hidden');
+  if (authInlineCodeBox) authInlineCodeBox.classList.add('hidden');
+  if (authInlinePasswordBox) authInlinePasswordBox.classList.add('hidden');
+  if (authInlineState) authInlineState.textContent = '待命';
+  if (authInlineSummary) authInlineSummary.textContent = '当 Telegram 要求验证码或两步验证密码时，可在这里手动输入。';
+  if (authInlineCodeInput) authInlineCodeInput.value = '';
+  if (authInlinePasswordInput) authInlinePasswordInput.value = '';
+}
+
 function setActiveTab(name) {
   tabButtons.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tabButton === name);
@@ -174,6 +214,51 @@ function hideModal() {
   if (passwordModal) passwordModal.classList.add('hidden');
   if (codeInput) codeInput.value = '';
   if (passwordInput) passwordInput.value = '';
+}
+
+function applyAuthState(json, options = {}) {
+  if (authStatusEl) authStatusEl.textContent = json.state || '未知';
+  if (!json.configured) {
+    hideModal();
+    hideInlineAuthPanel();
+    setActiveTab('settings');
+    return;
+  }
+  if (json.state === 'wait_code') {
+    showAuthCodeModal(json.detail || '请输入短信验证码');
+    showInlineAuthPanel('wait_code', json.detail);
+    if (options.scrollInline && authInlinePanel) {
+      authInlinePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return;
+  }
+  if (json.state === 'wait_password') {
+    showAuthPasswordModal(json.detail || '请输入两步验证密码');
+    showInlineAuthPanel('wait_password', json.detail);
+    if (options.scrollInline && authInlinePanel) {
+      authInlinePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return;
+  }
+  hideModal();
+  hideInlineAuthPanel();
+}
+
+async function submitAuthValue(type, value, inputEl) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    inputEl?.focus();
+    return;
+  }
+  await fetch('/api/auth/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type,
+      value: trimmed,
+    }),
+  });
+  if (inputEl) inputEl.value = '';
 }
 
 function showPrepareModal(info, filename) {
@@ -392,62 +477,36 @@ function buildSelectedFormat() {
 async function fetchAuthStatus() {
   const res = await fetch('/api/auth/status');
   const json = await res.json();
-  if (!json.configured) {
-    setActiveTab('settings');
-    return;
-  }
-  if (authStatusEl) authStatusEl.textContent = json.state || '未知';
-  if (json.state === 'wait_code') {
-    showAuthCodeModal(json.detail);
-    return;
-  }
-  if (json.state === 'wait_password') {
-    showAuthPasswordModal(json.detail);
-    return;
-  }
-  if (json.state === 'ready' || json.state === 'idle') {
-    hideModal();
-  }
+  applyAuthState(json);
 }
 
 async function openAuthModalFromStatus() {
   const res = await fetch('/api/auth/status');
   const json = await res.json();
-  if (authStatusEl) authStatusEl.textContent = json.state || '未知';
-  if (json.state === 'wait_code') {
-    showAuthCodeModal(json.detail || '请输入短信验证码');
-    return;
-  }
-  if (json.state === 'wait_password') {
-    showAuthPasswordModal(json.detail || '请输入两步验证密码');
-    return;
-  }
+  applyAuthState(json, { scrollInline: true });
+  if (json.state === 'wait_code' || json.state === 'wait_password') return;
   const detail = json.detail || '当前没有待输入的验证码或两步验证密码';
   window.alert(detail);
 }
 
 codeForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  await fetch('/api/auth/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'code',
-      value: codeInput?.value || '',
-    }),
-  });
+  await submitAuthValue('code', codeInput?.value, codeInput);
 });
 
 passwordForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  await fetch('/api/auth/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'password',
-      value: passwordInput?.value || '',
-    }),
-  });
+  await submitAuthValue('password', passwordInput?.value, passwordInput);
+});
+
+authInlineCodeForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await submitAuthValue('code', authInlineCodeInput?.value, authInlineCodeInput);
+});
+
+authInlinePasswordForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await submitAuthValue('password', authInlinePasswordInput?.value, authInlinePasswordInput);
 });
 
 function keepSelectionCurrent(kind, items) {
@@ -1510,16 +1569,7 @@ function connectSSE() {
   };
   evtSource.addEventListener('auth', (event) => {
     const payload = JSON.parse(event.data || '{}');
-    if (payload.state === 'wait_code') {
-      showAuthCodeModal(payload.detail);
-    }
-    if (payload.state === 'wait_password') {
-      showAuthPasswordModal(payload.detail);
-    }
-    if (payload.state === 'ready') {
-      hideModal();
-    }
-    if (authStatusEl) authStatusEl.textContent = payload.state || '未知';
+    applyAuthState(payload);
   });
   evtSource.addEventListener('download', () => {
     loadDownloads();

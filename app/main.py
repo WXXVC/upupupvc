@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import mimetypes
 from pathlib import Path
+from urllib.parse import quote
 
 import shutil
 
@@ -77,6 +78,14 @@ def _guess_file_type_from_path(path: Path | None) -> str:
     if suffix in {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".opus"}:
         return "audio"
     return "file"
+
+
+def _inline_file_headers(filename: str) -> dict[str, str]:
+    encoded = quote(filename)
+    return {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f"inline; filename*=UTF-8''{encoded}",
+    }
 
 
 def _serialize_upload_task(task) -> dict:
@@ -518,7 +527,7 @@ async def api_task_file(task_id: int, variant: str = "raw"):
     if not target.exists() or not target.is_file():
         return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
     media_type, _ = mimetypes.guess_type(str(target))
-    headers = {"Accept-Ranges": "bytes", "Content-Disposition": f'inline; filename="{target.name}"'}
+    headers = _inline_file_headers(target.name)
     return FileResponse(target, media_type=media_type or "application/octet-stream", filename=target.name, headers=headers)
 
 
@@ -560,7 +569,7 @@ async def api_upload_task_file(task_id: int, variant: str = "raw"):
     if not target.exists() or not target.is_file():
         return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
     media_type, _ = mimetypes.guess_type(str(target))
-    headers = {"Accept-Ranges": "bytes", "Content-Disposition": f'inline; filename="{target.name}"'}
+    headers = _inline_file_headers(target.name)
     return FileResponse(target, media_type=media_type or "application/octet-stream", filename=target.name, headers=headers)
 
 
