@@ -42,7 +42,7 @@ docker run -d \
   -p 9988:9988 \
   -v $PWD/data.db:/app/data.db \
   -v $PWD/downloads:/app/downloads \
-  ghcr.io/WXXVC/upupupvc:latest
+  ghcr.io/wxxvc/upupupvc:latest
 ```
 ghcr.io/<你的 GitHub 用户名或组织名>/<仓库名>:latest
 
