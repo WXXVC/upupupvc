@@ -250,7 +250,7 @@ async function submitAuthValue(type, value, inputEl) {
     inputEl?.focus();
     return;
   }
-  await fetch('/api/auth/submit', {
+  const res = await fetch('/api/auth/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -258,6 +258,14 @@ async function submitAuthValue(type, value, inputEl) {
       value: trimmed,
     }),
   });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok) {
+    const detail = json.detail || '认证提交失败，请稍后重试';
+    window.alert(detail);
+    inputEl?.focus();
+    inputEl?.select?.();
+    return;
+  }
   if (inputEl) inputEl.value = '';
 }
 

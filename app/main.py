@@ -11,6 +11,11 @@ from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from telethon.errors import (
+    PasswordHashInvalidError,
+    PhoneCodeExpiredError,
+    PhoneCodeInvalidError,
+)
 
 from app.models.db import init_db
 from app.models.auth import load_auth_state
@@ -727,12 +732,34 @@ async def api_auth_submit(request: Request):
     data = await request.json()
     kind = data.get("type")
     value = (data.get("value") or "").strip()
+    if not value:
+        return JSONResponse({"ok": False, "error": "empty_value"}, status_code=400)
     if kind == "code":
-        await tdlib.submit_code(value)
-        return JSONResponse({"ok": True})
+        try:
+            await tdlib.submit_code(value)
+            return JSONResponse({"ok": True})
+        except PhoneCodeInvalidError:
+            add_log("warning", "Telegram 验证码错误，请重新输入最新验证码")
+            return JSONResponse(
+                {"ok": False, "error": "invalid_code", "detail": "验证码错误，请输入最新验证码"},
+                status_code=400,
+            )
+        except PhoneCodeExpiredError:
+            add_log("warning", "Telegram 验证码已过期，请重新获取验证码")
+            return JSONResponse(
+                {"ok": False, "error": "expired_code", "detail": "验证码已过期，请重新获取验证码"},
+                status_code=400,
+            )
     if kind == "password":
-        await tdlib.submit_password(value)
-        return JSONResponse({"ok": True})
+        try:
+            await tdlib.submit_password(value)
+            return JSONResponse({"ok": True})
+        except PasswordHashInvalidError:
+            add_log("warning", "Telegram 两步验证密码错误，请重新输入")
+            return JSONResponse(
+                {"ok": False, "error": "invalid_password", "detail": "两步验证密码错误，请重新输入"},
+                status_code=400,
+            )
     return JSONResponse({"ok": False, "error": "unknown type"}, status_code=400)
 
 
